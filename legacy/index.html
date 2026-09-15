@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GOTHAM PROTOCOL</title>
+<meta name="color-scheme" content="dark">
+<!--
+  GOTHAM PROTOCOL — a single-file, offline, gamified self-improvement HUD.
+  Everything (markup, styling, logic, data) lives in this one file.
+  Open by double-clicking. No server, no internet, no build step required.
+
+  Data is auto-saved to localStorage and can be Exported/Imported as JSON.
+  "Download standalone copy" bakes your current state into a fresh HTML file.
+-->
+<!-- Baked state slot: a standalone copy writes your data here as JSON. Empty by default. -->
+<script id="__BAKED_STATE__" type="application/json"></script>
+<style>
+/* ============================================================
+   THEME / PALETTE
+   ============================================================ */
+:root{
+  --bg:#050506;
+  --bg2:#08080a;
+  --bg3:#0d0d10;
+  --panel:rgba(15,15,18,0.6);
+  --panel-solid:#0f0f12;
+  --edge:rgba(255,255,255,0.07);
+  --edge-strong:rgba(255,255,255,0.14);
+  /* Minimal scheme: neon red + shades of black/grey + white. Legacy var names repurposed. */
+  --red:#ff2537;
+  --red-bright:#ff5563;
+  --red-deep:#b3141f;
+  --red-dark:#6e0d15;
+  --gold:#ff2537;        /* repurposed -> primary neon red */
+  --cyan:#c7ccd6;        /* repurposed -> steel / silver */
+  --magenta:#7a0d14;     /* repurposed -> deep crimson */
+  --text:#edeef2;
+  --muted:#8a8e99;
+  --muted-2:#585b66;
+  --good:#c7ccd6;        /* repurposed -> silver (no green in scheme) */
+  --danger:#ff5563;
+  --accent:#ff2537;      /* global theme accent (settings) */
+  --aura:#ff2537;        /* rank aura color (set per-tier by JS) */
+  --aura-2:#ff5563;
+  --font-display:"Bahnschrift","Oswald","Franklin Gothic Medium","Arial Narrow",system-ui,sans-serif;
+  --font-mono:"Cascadia Code","JetBrains Mono","Consolas",ui-monospace,monospace;
+  --radius:14px;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(199,204,214,0.06), transparent 60%),
+    radial-gradient(1000px 800px at 100% 0%, rgba(122,13,20,0.05), transparent 55%),
+    radial-gradient(900px 900px at 50% 120%, rgba(255,37,55,0.05), transparent 60%),
+    linear-gradient(180deg, var(--bg2), var(--bg) 60%);
+  color:var(--text);
+  font-family:var(--font-mono);
+  font-size:14px;
+  line-height:1.5;
+  min-height:100%;
+  overflow-x:hidden;
+  letter-spacing:0.2px;
+}
+
+/* ============================================================
+   BACKGROUND FX LAYERS (fog / grid / scanlines / vignette)
+   ============================================================ */
+#fog{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0.55;}
+.grid-overlay{
+  position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.35;
+  background-image:
+    linear-gradient(rgba(199,204,214,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(199,204,214,0.05) 1px, transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(circle at 50% 40%, black, transparent 85%);
+  -webkit-mask-image:radial-gradient(circle at 50% 40%, black, transparent 85%);
+}
+.scanlines{
+  position:fixed;inset:0;z-index:60;pointer-events:none;opacity:0.35;
+  background:repeating-linear-gradient(180deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.22) 3px);
+  mix-blend-mode:multiply;
+}
+.vignette{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  box-shadow:inset 0 0 240px 60px rgba(0,0,0,0.85), inset 0 0 60px 10px rgba(0,0,0,0.6);
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.app{position:relative;z-index:2;max-width:1440px;margin:0 auto;padding:18px 22px 60px;}
+
+header.hud-header{
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:14px 18px;margin-bottom:20px;
+  background:linear-gradient(180deg, rgba(20,23,36,0.8), rgba(12,14,22,0.65));
+  border:1px solid var(--edge);
+  border-radius:var(--radius);
+  position:relative;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+header.hud-header::before{
+  content:"";position:absolute;inset:0;border-radius:var(--radius);pointer-events:none;
+  box-shadow:inset 0 0 22px rgba(199,204,214,0.06);
+}
+.brand{display:flex;align-items:center;gap:14px;min-width:0;}
+.brand .emblem{width:46px;height:46px;filter:drop-shadow(0 0 8px rgba(255,37,55,0.5));flex-shrink:0;}
+.brand h1{
+  font-family:var(--font-display);
+  font-weight:700;font-size:26px;letter-spacing:5px;text-transform:uppercase;
+  margin:0;line-height:1;white-space:nowrap;color:#fff;
+  text-shadow:0 0 6px rgba(255,37,55,0.7), 0 0 18px rgba(255,37,55,0.45), 0 0 42px rgba(255,37,55,0.22);
+}
+.brand .sub{font-size:11px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;}
+.header-spacer{flex:1 1 auto;}
+.header-date{font-size:12px;color:var(--muted);text-align:right;letter-spacing:1px;white-space:nowrap;}
+.header-date b{color:var(--accent);}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* Buttons */
+button{font-family:inherit;color:inherit;cursor:pointer;}
+.btn{
+  background:linear-gradient(180deg, rgba(30,34,50,0.9), rgba(18,20,32,0.9));
+  border:1px solid var(--edge-strong);
+  color:var(--text);
+  padding:9px 13px;border-radius:9px;font-size:12px;letter-spacing:1px;text-transform:uppercase;
+  transition:transform .12s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+  display:inline-flex;align-items:center;gap:7px;
+}
+.btn:hover{transform:translateY(-1px);border-color:var(--accent);box-shadow:0 0 16px rgba(255,37,55,0.22);}
+.btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.btn.ghost{background:transparent;border-color:var(--edge);}
+.btn.accent{border-color:var(--accent);box-shadow:0 0 14px rgba(255,37,55,0.18);}
+.btn.danger{border-color:rgba(255,84,112,0.5);color:#ffb9c4;}
+.btn.danger:hover{border-color:var(--danger);box-shadow:0 0 16px rgba(255,84,112,0.3);}
+.btn.sm{padding:6px 9px;font-size:11px;}
+.btn .ic{width:15px;height:15px;flex-shrink:0;}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+
+.hud-body{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;}
+
+/* ============================================================
+   PROFILE PANEL (centerpiece)
+   ============================================================ */
+.panel{
+  position:relative;
+  background:var(--panel);
+  border:1px solid var(--edge);
+  border-radius:var(--radius);
+  backdrop-filter:blur(9px);
+  -webkit-backdrop-filter:blur(9px);
+  box-shadow:0 10px 40px rgba(0,0,0,0.5), inset 0 0 30px rgba(255,255,255,0.02);
+}
+.panel::before{ /* art-deco corner ticks */
+  content:"";position:absolute;inset:8px;border-radius:8px;pointer-events:none;
+  background:
+    linear-gradient(var(--edge-strong),var(--edge-strong)) left top/18px 1px no-repeat,
+    linear-gradient(var(--edge-strong),var(--edge-strong)) left top/1px 18px no-repeat,
+    linear-gradient(var(--edge-strong),var(--edge-strong)) right top/18px 1px no-repeat,
+    linear-gradient(var(--edge-strong),var(--edge-strong)) right top/1px 18px no-repeat,
+    linear-gradient(var(--edge-strong),var(--edge-strong)) left bottom/18px 1px no-repeat,
+    linear-gradient(var(--edge-strong),var(--edge-strong)) left bottom/1px 18px no-repeat,
+    linear-gradient(var(--edge-strong),var(--edge-strong)) right bottom/18px 1px no-repeat,
+    linear-gradient(var(--edge-strong),var(--edge-strong)) right bottom/1px 18px no-repeat;
+}
+
+#profile-panel{padding:20px 18px 22px;position:sticky;top:18px;text-align:center;overflow:visible;}
+.portrait-wrap{
+  position:relative;width:230px;height:270px;margin:6px auto 4px;
+}
+.portrait-frame{
+  position:absolute;inset:0;
+  border:1px solid var(--edge-strong);
+  border-radius:12px;
+  overflow:hidden;
+  background:radial-gradient(circle at 50% 30%, rgba(255,255,255,0.05), rgba(0,0,0,0.6));
+  clip-path:polygon(0 22px, 22px 0, calc(100% - 22px) 0, 100% 22px, 100% calc(100% - 22px), calc(100% - 22px) 100%, 22px 100%, 0 calc(100% - 22px));
+  z-index:3;
+}
+.portrait-frame img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(0.6) contrast(1.08) brightness(0.98);}
+/* Smoke wafting off the portrait (low-opacity canvas painted by JS).
+   The radial mask feathers the canvas edges to transparent so there is no
+   visible rectangular boundary — the smoke just dissolves into the dark. */
+.portrait-smoke{
+  position:absolute;left:-50px;top:-50px;width:calc(100% + 100px);height:calc(100% + 100px);
+  z-index:5;pointer-events:none;
+  -webkit-mask-image:radial-gradient(farthest-side at 50% 50%, #000 52%, transparent 100%);
+  mask-image:radial-gradient(farthest-side at 50% 50%, #000 52%, transparent 100%);
+}
+.portrait-aura{
+  position:absolute;inset:-24px;border-radius:26px;z-index:1;pointer-events:none;
+  background:radial-gradient(circle at 50% 45%, var(--aura), transparent 62%);
+  filter:blur(18px);opacity:.55;
+  animation:aura-pulse 4.5s ease-in-out infinite;
+}
+.portrait-ring{
+  position:absolute;inset:-6px;border-radius:16px;z-index:4;pointer-events:none;
+  border:1.5px solid color-mix(in srgb, var(--aura) 85%, white 12%);
+  box-shadow:
+    0 0 4px var(--aura),
+    0 0 22px color-mix(in srgb, var(--aura) 72%, transparent),
+    0 0 48px color-mix(in srgb, var(--aura) 42%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--aura) 30%, transparent);
+  animation:ring-pulse 3.4s ease-in-out infinite;
+}
+.portrait-placeholder{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  color:var(--muted);
+}
+.portrait-placeholder svg{width:88px;height:88px;filter:drop-shadow(0 0 14px var(--aura));opacity:.85;}
+.portrait-placeholder .ph-tier{font-family:var(--font-display);letter-spacing:3px;text-transform:uppercase;font-size:13px;color:color-mix(in srgb, var(--aura) 80%, white);}
+.portrait-upload{
+  position:absolute;bottom:8px;right:8px;z-index:6;
+  font-size:10px;padding:5px 8px;
+}
+
+.rank-title{
+  font-family:var(--font-display);font-weight:700;text-transform:uppercase;
+  font-size:30px;letter-spacing:3px;line-height:1.05;margin:16px 0 2px;
+  background:linear-gradient(90deg, #fff, var(--aura) 55%, #fff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 24px color-mix(in srgb, var(--aura) 45%, transparent);
+}
+.rank-tier-label{font-size:11px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;}
+
+.overall-block{margin-top:16px;text-align:left;}
+.overall-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.overall-row .lbl{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+.overall-row .lvl{font-family:var(--font-display);font-size:34px;line-height:1;color:#fff;text-shadow:0 0 16px color-mix(in srgb, var(--aura) 50%, transparent);}
+.mini-stats{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:8px;}
+.mini-stats b{color:var(--text);font-family:var(--font-display);letter-spacing:1px;}
+
+.streak-badge{
+  margin-top:16px;display:inline-flex;align-items:center;gap:9px;
+  padding:9px 14px;border-radius:30px;
+  background:linear-gradient(180deg, rgba(255,37,55,0.14), rgba(255,37,55,0.05));
+  border:1px solid rgba(255,37,55,0.35);
+  box-shadow:0 0 18px rgba(255,37,55,0.15);
+}
+.streak-badge .flame{width:18px;height:18px;filter:drop-shadow(0 0 6px var(--gold));}
+.streak-badge .n{font-family:var(--font-display);font-size:20px;color:var(--gold);line-height:1;}
+.streak-badge .t{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.flavor{margin-top:12px;font-size:12px;font-style:italic;color:var(--muted);letter-spacing:.3px;}
+
+/* ============================================================
+   ENERGY / HEALTH BAR
+   ============================================================ */
+.bar{
+  position:relative;height:16px;border-radius:6px;overflow:hidden;
+  background:linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.35));
+  border:1px solid var(--edge-strong);
+}
+.bar .fill{
+  position:absolute;left:0;top:0;bottom:0;width:0%;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--barc,var(--accent)) 55%, #000), var(--barc,var(--accent)));
+  box-shadow:0 0 14px color-mix(in srgb, var(--barc,var(--accent)) 65%, transparent), inset 0 0 8px rgba(255,255,255,0.25);
+  transition:width .7s cubic-bezier(.2,.9,.25,1);
+}
+.bar .fill::after{ /* moving sheen */
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform:translateX(-100%);animation:sheen 2.6s ease-in-out infinite;
+}
+.bar .segments{
+  position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg, transparent 0, transparent calc(6.66% - 2px), rgba(0,0,0,0.65) calc(6.66% - 2px), rgba(0,0,0,0.65) 6.66%);
+}
+.bar.pulse .fill{animation:barpulse 2.2s ease-in-out infinite;}
+.bar.surge .fill{animation:surge .6s ease-out;}
+.bar-tiny{height:8px;}
+
+/* ============================================================
+   TABS + VIEWS
+   ============================================================ */
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.tab{
+  background:rgba(18,21,32,0.6);border:1px solid var(--edge);color:var(--muted);
+  padding:9px 16px;border-radius:9px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;
+  transition:all .18s ease;
+}
+.tab:hover{color:var(--text);border-color:var(--edge-strong);}
+.tab.active{color:#fff;border-color:var(--accent);background:linear-gradient(180deg, rgba(255,37,55,0.14), rgba(255,37,55,0.04));box-shadow:0 0 16px rgba(255,37,55,0.15);}
+.view{display:none;animation:fadein .35s ease;}
+.view.active{display:block;}
+
+/* ============================================================
+   PILLAR CARDS
+   ============================================================ */
+.pillar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.pillar-card{
+  padding:18px 18px 16px;position:relative;overflow:hidden;
+  /* echo of the profile effect: accent-tinted neon edge + breathing aura glow */
+  border-color:color-mix(in srgb, var(--pc,var(--accent)) 38%, var(--edge));
+  box-shadow:0 10px 34px rgba(0,0,0,0.5), 0 0 16px color-mix(in srgb, var(--pc,var(--accent)) 20%, transparent), inset 0 0 30px color-mix(in srgb, var(--pc,var(--accent)) 8%, transparent);
+  animation:card-aura 4.6s ease-in-out infinite;
+}
+.pillar-card .glowline{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg, transparent, var(--pc,var(--accent)), transparent);opacity:.7;box-shadow:0 0 10px var(--pc,var(--accent));}
+@keyframes card-aura{
+  0%,100%{box-shadow:0 10px 34px rgba(0,0,0,0.5), 0 0 13px color-mix(in srgb, var(--pc,var(--accent)) 16%, transparent), inset 0 0 26px color-mix(in srgb, var(--pc,var(--accent)) 6%, transparent);}
+  50%{box-shadow:0 10px 34px rgba(0,0,0,0.5), 0 0 28px color-mix(in srgb, var(--pc,var(--accent)) 36%, transparent), inset 0 0 36px color-mix(in srgb, var(--pc,var(--accent)) 14%, transparent);}
+}
+.pc-head{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
+.pc-icon{
+  width:44px;height:44px;flex-shrink:0;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 40% 30%, color-mix(in srgb, var(--pc,var(--accent)) 30%, transparent), rgba(0,0,0,0.4));
+  border:1px solid color-mix(in srgb, var(--pc,var(--accent)) 45%, transparent);
+  box-shadow:0 0 16px color-mix(in srgb, var(--pc,var(--accent)) 25%, transparent);
+}
+.pc-icon svg{width:24px;height:24px;color:var(--pc,var(--accent));filter:drop-shadow(0 0 5px color-mix(in srgb, var(--pc,var(--accent)) 60%, transparent));}
+.pc-title{flex:1;min-width:0;}
+.pc-title .name{font-family:var(--font-display);font-size:19px;letter-spacing:2px;text-transform:uppercase;color:#fff;line-height:1.05;}
+.pc-title .theme{font-size:10.5px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+.pc-level{text-align:right;flex-shrink:0;}
+.pc-level .lv-num{font-family:var(--font-display);font-size:30px;line-height:1;color:var(--pc,var(--accent));text-shadow:0 0 14px color-mix(in srgb, var(--pc,var(--accent)) 50%, transparent);}
+.pc-level .lv-lbl{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+.pc-barrow{margin:12px 0 6px;}
+.pc-xp{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:5px;letter-spacing:.5px;}
+.pc-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+.log-btn{
+  background:rgba(255,255,255,0.03);border:1px solid var(--edge);color:var(--text);
+  padding:7px 10px;border-radius:8px;font-size:11.5px;letter-spacing:.5px;
+  transition:all .14s ease;display:inline-flex;align-items:center;gap:6px;
+}
+.log-btn:hover{border-color:var(--pc,var(--accent));background:color-mix(in srgb, var(--pc,var(--accent)) 12%, transparent);box-shadow:0 0 12px color-mix(in srgb, var(--pc,var(--accent)) 25%, transparent);transform:translateY(-1px);}
+.log-btn .xp{color:var(--pc,var(--accent));font-family:var(--font-display);font-size:12px;}
+.pc-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:10.5px;color:var(--muted-2);}
+.pc-foot .last b{color:var(--muted);}
+
+.section-title{font-family:var(--font-display);font-size:16px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin:0 0 12px;display:flex;align-items:center;gap:10px;}
+.section-title::after{content:"";flex:1;height:1px;background:linear-gradient(90deg, var(--edge-strong), transparent);}
+.toolbar-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+
+/* ============================================================
+   FORM CONTROLS
+   ============================================================ */
+input,select,textarea{
+  font-family:var(--font-mono);font-size:13px;color:var(--text);
+  background:rgba(0,0,0,0.35);border:1px solid var(--edge-strong);border-radius:8px;
+  padding:8px 10px;outline:none;transition:border-color .16s ease, box-shadow .16s ease;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 12px rgba(255,37,55,0.18);}
+label.field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+input[type=color]{padding:2px;height:36px;width:52px;cursor:pointer;}
+input[type=range]{accent-color:var(--accent);}
+select{cursor:pointer;}
+.pillar-select{min-width:150px;}
+
+/* ============================================================
+   HISTORY
+   ============================================================ */
+.timeline{display:flex;flex-direction:column;gap:9px;}
+.log-item{
+  display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;
+  padding:11px 14px;border-radius:10px;
+  background:rgba(255,255,255,0.02);border:1px solid var(--edge);
+  transition:border-color .16s ease, background .16s ease;
+}
+.log-item:hover{border-color:var(--edge-strong);background:rgba(255,255,255,0.035);}
+.log-dot{width:11px;height:11px;border-radius:50%;background:var(--pc,var(--accent));box-shadow:0 0 10px var(--pc,var(--accent));}
+.log-main .action{font-size:13.5px;color:var(--text);}
+.log-main .meta{font-size:10.5px;color:var(--muted);letter-spacing:.5px;}
+.log-main .note{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:2px;}
+.log-xp{font-family:var(--font-display);font-size:17px;color:var(--pc,var(--accent));white-space:nowrap;}
+.log-tools{display:flex;gap:6px;}
+.icon-btn{background:transparent;border:1px solid var(--edge);border-radius:7px;padding:5px 7px;color:var(--muted);transition:all .14s ease;}
+.icon-btn:hover{color:var(--text);border-color:var(--edge-strong);}
+.icon-btn.danger:hover{color:var(--danger);border-color:var(--danger);}
+.icon-btn svg{width:14px;height:14px;display:block;}
+.empty{padding:40px;text-align:center;color:var(--muted);font-style:italic;}
+
+/* ============================================================
+   STATS
+   ============================================================ */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
+.chart-card{padding:16px 18px;}
+.chart-card h3{font-family:var(--font-display);font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin:0 0 14px;}
+.heat-legend{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);margin-top:10px;justify-content:flex-end;}
+.heat-legend .sw{width:12px;height:12px;border-radius:3px;border:1px solid var(--edge);}
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+.settings-grid{display:flex;flex-direction:column;gap:18px;}
+.setblock{padding:16px 18px;}
+.setblock h3{font-family:var(--font-display);font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin:0 0 14px;}
+.set-pillar{border:1px solid var(--edge);border-radius:10px;padding:12px;margin-bottom:12px;background:rgba(0,0,0,0.2);}
+.set-pillar .row1{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;}
+.set-actions-list{display:flex;flex-direction:column;gap:7px;}
+.set-action-row{display:flex;gap:8px;align-items:center;}
+.set-action-row input.a-name{flex:1;}
+.set-action-row input.a-xp{width:80px;}
+.reorder{display:flex;flex-direction:column;gap:2px;}
+.reorder button{padding:1px 6px;font-size:10px;line-height:1.2;}
+.rank-row{display:grid;grid-template-columns:44px 1fr 90px 1fr auto;gap:8px;align-items:center;margin-bottom:8px;}
+.rank-row .tno{font-family:var(--font-display);font-size:18px;color:var(--muted);text-align:center;}
+.rank-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--edge-strong);background:rgba(0,0,0,0.4);}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--edge);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-row .desc{font-size:11px;color:var(--muted);}
+.switch{position:relative;width:48px;height:26px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;inset:0;background:rgba(0,0,0,0.5);border:1px solid var(--edge-strong);border-radius:30px;transition:.2s;cursor:pointer;}
+.slider::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:.2s;}
+.switch input:checked + .slider{background:color-mix(in srgb, var(--accent) 30%, transparent);border-color:var(--accent);}
+.switch input:checked + .slider::before{transform:translateX(22px);background:var(--accent);box-shadow:0 0 10px var(--accent);}
+.accent-picker{display:flex;gap:10px;flex-wrap:wrap;}
+.accent-swatch{width:34px;height:34px;border-radius:8px;border:2px solid transparent;cursor:pointer;transition:transform .12s ease;}
+.accent-swatch:hover{transform:scale(1.1);}
+.accent-swatch.active{border-color:#fff;box-shadow:0 0 14px currentColor;}
+
+/* ============================================================
+   MODALS + TOASTS
+   ============================================================ */
+#modal-root{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px;}
+#modal-root.open{display:flex;}
+.modal-backdrop{position:absolute;inset:0;background:rgba(3,4,8,0.78);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+.modal{
+  position:relative;z-index:1;width:min(520px,100%);max-height:88vh;overflow:auto;
+  padding:22px;background:linear-gradient(180deg, rgba(22,25,38,0.98), rgba(14,16,26,0.98));
+  border:1px solid var(--edge-strong);border-radius:16px;
+  box-shadow:0 30px 80px rgba(0,0,0,0.7), inset 0 0 30px rgba(199,204,214,0.05);
+}
+.modal h2{font-family:var(--font-display);font-size:20px;letter-spacing:2px;text-transform:uppercase;margin:0 0 6px;color:#fff;}
+.modal p.sub{color:var(--muted);font-size:12.5px;margin:0 0 18px;}
+.modal .form-col{display:flex;flex-direction:column;gap:14px;}
+.modal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;}
+
+#toast-container{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:10px;align-items:center;pointer-events:none;}
+.toast{
+  pointer-events:auto;padding:11px 18px;border-radius:10px;font-size:13px;
+  background:linear-gradient(180deg, rgba(24,27,42,0.97), rgba(16,18,28,0.97));
+  border:1px solid var(--edge-strong);box-shadow:0 10px 30px rgba(0,0,0,0.5);
+  animation:toastin .3s ease;display:flex;align-items:center;gap:10px;max-width:90vw;
+}
+.toast.levelup{border-color:var(--sc,var(--accent));box-shadow:0 0 24px color-mix(in srgb, var(--sc,var(--accent)) 42%, transparent);}
+.toast b{font-family:var(--font-display);letter-spacing:1px;}
+
+/* ============================================================
+   RANK-UP CINEMATIC OVERLAY
+   ============================================================ */
+#rankup-overlay{position:fixed;inset:0;z-index:250;display:none;overflow:hidden;pointer-events:none;}
+#rankup-overlay.play{display:block;}
+.ru-dim{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%, rgba(0,0,0,0.2), rgba(0,0,0,0.9));animation:ru-dim 3.4s ease forwards;}
+.ru-beam{
+  position:absolute;top:50%;left:50%;width:260%;height:130px;
+  transform-origin:left center;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--aura) 85%, white), transparent 70%);
+  filter:blur(6px);opacity:0;mix-blend-mode:screen;
+  animation:ru-sweep 3.2s ease-in-out;
+}
+.ru-signal{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.4);
+  width:min(420px,70vw);opacity:0;filter:drop-shadow(0 0 40px var(--aura));
+  animation:ru-signal 3.2s cubic-bezier(.2,.9,.25,1) forwards;
+}
+.ru-signal svg{width:100%;height:auto;color:var(--aura);}
+.ru-text{
+  position:absolute;left:50%;bottom:16%;transform:translateX(-50%);text-align:center;opacity:0;
+  animation:ru-text 3.2s ease forwards;animation-delay:.5s;width:90%;
+}
+.ru-text .k{font-size:14px;letter-spacing:6px;color:var(--aura);text-transform:uppercase;text-shadow:0 0 16px var(--aura);}
+.ru-text .title{
+  font-family:var(--font-display);font-size:min(72px,13vw);font-weight:700;letter-spacing:6px;text-transform:uppercase;line-height:1;margin-top:6px;
+  color:#fff;text-shadow:0 0 30px var(--aura), 0 0 60px color-mix(in srgb, var(--aura) 60%, transparent);
+}
+.ru-glitch{position:absolute;inset:0;background:var(--aura);mix-blend-mode:overlay;opacity:0;animation:ru-glitch 3.2s steps(1) forwards;}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes aura-pulse{0%,100%{opacity:.42;transform:scale(1);}50%{opacity:.72;transform:scale(1.05);}}
+@keyframes sheen{0%{transform:translateX(-100%);}60%,100%{transform:translateX(220%);}}
+@keyframes barpulse{0%,100%{box-shadow:0 0 12px color-mix(in srgb, var(--barc,var(--accent)) 55%, transparent), inset 0 0 8px rgba(255,255,255,0.2);}50%{box-shadow:0 0 22px color-mix(in srgb, var(--barc,var(--accent)) 85%, transparent), inset 0 0 12px rgba(255,255,255,0.35);}}
+@keyframes surge{0%{filter:brightness(2.4) saturate(1.5);}100%{filter:brightness(1);}}
+@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+@keyframes toastin{from{opacity:0;transform:translateY(16px) scale(.96);}to{opacity:1;transform:none;}}
+@keyframes ru-dim{0%{opacity:0;}12%{opacity:1;}80%{opacity:1;}100%{opacity:0;}}
+@keyframes ru-sweep{0%{opacity:0;transform:translate(-4%,-50%) rotate(-32deg);}18%{opacity:.9;}55%{opacity:.9;transform:translate(-4%,-50%) rotate(28deg);}100%{opacity:0;transform:translate(-4%,-50%) rotate(40deg);}}
+@keyframes ru-signal{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-6deg);}22%{opacity:1;transform:translate(-50%,-50%) scale(1.06) rotate(0);}70%{opacity:1;transform:translate(-50%,-50%) scale(1);}100%{opacity:0;transform:translate(-50%,-50%) scale(1.15);}}
+@keyframes ru-text{0%{opacity:0;transform:translateX(-50%) translateY(20px);}20%{opacity:1;transform:translateX(-50%) translateY(0);}80%{opacity:1;}100%{opacity:0;}}
+@keyframes ru-glitch{0%,100%{opacity:0;}6%{opacity:.5;}7%{opacity:0;}10%{opacity:.4;}11%{opacity:0;}}
+@keyframes cardflash{0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--flash, var(--pc,var(--accent))) 70%, transparent);}100%{box-shadow:0 0 40px 7px transparent;}}
+.pillar-card.levelup{animation:cardflash 1s ease-out;}
+@keyframes ring-pulse{0%,100%{opacity:.82;}50%{opacity:1;}}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width:1080px){
+  .hud-body{grid-template-columns:1fr;}
+  #profile-panel{position:relative;top:0;}
+  .portrait-wrap{width:210px;height:250px;}
+}
+@media (max-width:620px){
+  .app{padding:12px 12px 40px;}
+  .brand h1{font-size:20px;letter-spacing:3px;}
+  .pillar-grid{grid-template-columns:1fr;}
+  .log-item{grid-template-columns:auto 1fr;grid-template-areas:"dot main" "xp tools";}
+  .rank-row{grid-template-columns:34px 1fr;gap:6px;}
+}
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+.reduce-motion *{animation:none !important;transition:none !important;}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.001ms !important;}
+}
+</style>
+</head>
+<body>
+<canvas id="fog" aria-hidden="true"></canvas>
+<div class="grid-overlay" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<div class="app">
+  <!-- ============ HEADER ============ -->
+  <header class="hud-header">
+    <div class="brand">
+      <span class="emblem" id="emblem-slot" aria-hidden="true"></span>
+      <div>
+        <h1 id="app-title">GOTHAM PROTOCOL</h1>
+        <div class="sub">Self-Improvement Command Console</div>
+      </div>
+    </div>
+    <div class="header-spacer"></div>
+    <div class="header-date" id="header-date"></div>
+    <div class="header-actions">
+      <button class="btn ghost sm" id="btn-export" aria-label="Export backup JSON">Export</button>
+      <button class="btn ghost sm" id="btn-import" aria-label="Import backup JSON">Import</button>
+      <button class="btn ghost sm" id="btn-standalone" aria-label="Download standalone HTML copy">Standalone Copy</button>
+      <button class="btn danger sm" id="btn-reset" aria-label="Reset all data">Reset</button>
+    </div>
+  </header>
+
+  <!-- ============ BODY ============ -->
+  <div class="hud-body">
+    <!-- Profile panel (centerpiece) -->
+    <aside class="panel" id="profile-panel" data-dynamic aria-label="Profile and rank"></aside>
+
+    <!-- Main content -->
+    <section id="content">
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-view="dashboard" role="tab">Pillars</button>
+        <button class="tab" data-view="history" role="tab">History</button>
+        <button class="tab" data-view="stats" role="tab">Stats</button>
+        <button class="tab" data-view="settings" role="tab">Settings</button>
+      </nav>
+
+      <div class="view active" id="view-dashboard" role="tabpanel">
+        <div class="toolbar-row">
+          <h2 class="section-title" style="flex:1">Five Pillars</h2>
+          <button class="btn accent sm" id="btn-custom-log">+ Custom Log</button>
+        </div>
+        <div class="pillar-grid" id="pillar-grid" data-dynamic></div>
+      </div>
+
+      <div class="view" id="view-history" role="tabpanel">
+        <h2 class="section-title">Activity Log</h2>
+        <div class="toolbar-row">
+          <label class="field" style="text-transform:none">Filter pillar
+            <select id="hist-filter-pillar" class="pillar-select"></select>
+          </label>
+          <label class="field" style="text-transform:none">From
+            <input type="date" id="hist-from">
+          </label>
+          <label class="field" style="text-transform:none">To
+            <input type="date" id="hist-to">
+          </label>
+          <button class="btn ghost sm" id="hist-clear" style="align-self:flex-end">Clear filters</button>
+        </div>
+        <div class="timeline" id="timeline" data-dynamic></div>
+      </div>
+
+      <div class="view" id="view-stats" role="tabpanel">
+        <h2 class="section-title">Analytics</h2>
+        <div class="stats-grid" id="stats-grid" data-dynamic></div>
+      </div>
+
+      <div class="view" id="view-settings" role="tabpanel">
+        <h2 class="section-title">Console Configuration</h2>
+        <div class="settings-grid" id="settings-grid" data-dynamic></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Overlays -->
+<div id="rankup-overlay" aria-hidden="true"></div>
+<div id="toast-container" aria-live="polite"></div>
+<div id="modal-root" role="dialog" aria-modal="true"></div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="file-import" accept="application/json,.json" hidden>
+<input type="file" id="file-portrait" accept="image/*" hidden>
+
+<script>
+"use strict";
+/* ================================================================
+   GOTHAM PROTOCOL — application logic
+   Sections: CONFIG · STATE · PERSISTENCE · MECHANICS · RENDER ·
+             EVENTS · EFFECTS · SETTINGS · INIT
+   ================================================================ */
+
+/* ----------------------------------------------------------------
+   ICONS — inline SVG library (offline, no external assets)
+   ---------------------------------------------------------------- */
+const ICONS = {
+  bat: '<svg viewBox="0 0 100 60" fill="currentColor"><path d="M50 4c-3 6-6 9-10 10 2-4 2-8 1-11-4 5-9 9-16 11-9 3-19 2-25-2 4 8 3 14-2 20 7-1 12 1 16 6 3 4 4 9 3 14 6-4 12-4 18 0 3 2 6 5 8 9 2-4 5-7 8-9 6-4 12-4 18 0-1-5 0-10 3-14 4-5 9-7 16-6-5-6-6-12-2-20-6 4-16 5-25 2-7-2-12-6-16-11-1 3-1 7 1 11-4-1-7-4-9-10z"/></svg>',
+  dumbbell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6v12M3 9v6M18 6v12M21 9v6M6 12h12"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2z"/><path d="M18 3v18M8 7h6M8 11h6"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg>',
+  flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-1.5.5-2.5 1-3 0 2 1 3 2 3 0-3 2-6 2-9z"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>',
+  target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>',
+  brain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1 5 3 3 0 0 0 4 2V4a1 1 0 0 0-0-1z"/><path d="M15 3a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1 5 3 3 0 0 1-4 2"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.5 7 .8-5.2 4.7 1.5 7L12 17.8 5.2 21l1.5-7L1.5 9.3l7-.8z"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/></svg>'
+};
+const PILLAR_ICON_CHOICES = ["dumbbell","gear","book","eye","shield","flame","bolt","target","brain","star"];
+
+/* ================================================================
+   1. CONFIG  — every default value lives here and is tweakable
+   ================================================================ */
+const DEFAULT_CONFIG = {
+  appName: "GOTHAM PROTOCOL",
+  xpCurve: { base: 80, growth: 1.18 },  // xpToNext(L) = round(base * growth^(L-1))
+  pillars: [
+    { id:"forge",   name:"THE FORGE",   theme:"Gym / Body",       icon:"dumbbell", accent:"#ff2537",
+      actions:[ {label:"Workout",xp:50}, {label:"PR",xp:80}, {label:"Steps / Cardio",xp:30} ] },
+    { id:"craft",   name:"THE CRAFT",   theme:"Work / Career",    icon:"gear",     accent:"#ff5563",
+      actions:[ {label:"Task done",xp:40}, {label:"Deep work hr",xp:35}, {label:"Ship",xp:90} ] },
+    { id:"archive", name:"THE ARCHIVE", theme:"Reading / Mind",   icon:"book",     accent:"#c7ccd6",
+      actions:[ {label:"Chapter",xp:30}, {label:"30 min read",xp:25}, {label:"Finish book",xp:120} ] },
+    { id:"mirror",  name:"THE MIRROR",  theme:"Self-Review",      icon:"eye",      accent:"#8a8e99",
+      actions:[ {label:"Daily reflection",xp:30}, {label:"Weekly synthesis",xp:70} ] },
+    { id:"discipline", name:"DISCIPLINE", theme:"Keystone Habits", icon:"shield",  accent:"#b3141f",
+      actions:[ {label:"Habit kept",xp:25}, {label:"Streak day",xp:20} ] }
+  ],
+  ranks: [
+    { tier:0,  title:"Drifter",          threshold:0,   aura:"#55585f" },
+    { tier:1,  title:"Initiate",         threshold:6,   aura:"#7a2429" },
+    { tier:2,  title:"Vigilante",        threshold:14,  aura:"#a1161f" },
+    { tier:3,  title:"Knight Errant",    threshold:24,  aura:"#cc1a26" },
+    { tier:4,  title:"The Knight",       threshold:36,  aura:"#ff2537" },
+    { tier:5,  title:"Dark Knight",      threshold:50,  aura:"#ff4350" },
+    { tier:6,  title:"Sentinel",         threshold:66,  aura:"#ff5f6b" },
+    { tier:7,  title:"Warden of Gotham", threshold:84,  aura:"#ff7d87" },
+    { tier:8,  title:"Overlord",         threshold:104, aura:"#ff9aa2" },
+    { tier:9,  title:"Supreme Leader",   threshold:128, aura:"#ffc2c7" },
+    { tier:10, title:"The Legend",       threshold:156, aura:"#ffffff" }
+  ]
+};
+
+const ACCENT_CHOICES = ["#ff2537","#ff5563","#b3141f","#ff8a94","#c7ccd6","#8a8e99"];
+const FLAVOR_LINES = [
+  "Gotham sleeps. You don't.",
+  "The night is a discipline.",
+  "Every log is a brick in the cave.",
+  "Fear is a tool. So is consistency.",
+  "The city doesn't need a hero today. It needs your reps.",
+  "Order, forged from routine.",
+  "You are the protocol.",
+  "One more entry. One step deeper into legend."
+];
+
+const LS_KEY = "gotham_protocol_state_v1";
+const DEFAULT_ACCENT = "#ff2537";
+// Bump this when the built-in color scheme changes; migration refreshes colors on load
+// (pillar accents + rank auras + global accent) while preserving names, XP, history, portraits.
+const PALETTE_VERSION = 2;
+
+/* ================================================================
+   2. STATE
+   ================================================================ */
+let state = null;      // the single source of truth (persisted)
+let ui = { view:"dashboard", histFilter:{pillar:"all",from:"",to:""} };
+
+function defaultState(){
+  const cfg = clone(DEFAULT_CONFIG);
+  const pillars = {};
+  cfg.pillars.forEach(p => { pillars[p.id] = { xp:0, level:0, lastActivity:null }; });
+  return {
+    version: 1,
+    config: cfg,
+    pillars,
+    history: [],
+    portraits: {},                    // { tierIndex: base64 }
+    settings: { sound:false, motion:true, accent:DEFAULT_ACCENT },
+    _portraitsInIDB: false,
+    _paletteVersion: PALETTE_VERSION
+  };
+}
+
+// Refresh built-in colors to the current scheme without touching names/XP/history/portraits.
+// Runs when a loaded save predates the current PALETTE_VERSION.
+function migratePalette(s){
+  if(s._paletteVersion === PALETTE_VERSION) return;
+  const defAccent = {};
+  DEFAULT_CONFIG.pillars.forEach(p => { defAccent[p.id] = p.accent; });
+  s.config.pillars.forEach(p => { if(defAccent[p.id]) p.accent = defAccent[p.id]; });
+  s.config.ranks.forEach((r,i) => { if(DEFAULT_CONFIG.ranks[i]) r.aura = DEFAULT_CONFIG.ranks[i].aura; });
+  s.settings.accent = DEFAULT_ACCENT;
+  s._paletteVersion = PALETTE_VERSION;
+}
+
+/* Deep-merge a loaded/imported object onto a fresh default so missing keys never break the app */
+function hydrate(loaded){
+  const base = defaultState();
+  if(!loaded || typeof loaded !== "object") return base;
+  const s = base;
+  s.version = loaded.version || 1;
+  if(loaded.config && typeof loaded.config === "object"){
+    s.config.appName = loaded.config.appName || s.config.appName;
+    if(loaded.config.xpCurve) s.config.xpCurve = { base:num(loaded.config.xpCurve.base,80), growth:num(loaded.config.xpCurve.growth,1.18) };
+    if(Array.isArray(loaded.config.pillars) && loaded.config.pillars.length) s.config.pillars = loaded.config.pillars;
+    if(Array.isArray(loaded.config.ranks) && loaded.config.ranks.length) s.config.ranks = loaded.config.ranks;
+  }
+  s.history = Array.isArray(loaded.history) ? loaded.history.map(normalizeEntry).filter(Boolean) : [];
+  s.portraits = (loaded.portraits && typeof loaded.portraits === "object") ? loaded.portraits : {};
+  s._portraitsInIDB = !!loaded._portraitsInIDB;
+  if(loaded.settings) s.settings = Object.assign(s.settings, loaded.settings);
+  // carry the loaded palette version (undefined for pre-v2 saves), then refresh colors if stale
+  s._paletteVersion = loaded._paletteVersion;
+  migratePalette(s);
+  // rebuild pillar progress objects for current config, then recompute from history
+  s.pillars = {};
+  s.config.pillars.forEach(p => { s.pillars[p.id] = { xp:0, level:0, lastActivity:null }; });
+  state = s;                 // temporarily set so recompute() can read config
+  recompute();
+  return s;
+}
+
+function normalizeEntry(e){
+  if(!e || typeof e !== "object") return null;
+  return {
+    id: e.id || uid(),
+    ts: Number(e.ts) || Date.now(),
+    pillar: String(e.pillar || ""),
+    action: String(e.action || "Log"),
+    xp: Number(e.xp) || 0,
+    note: e.note ? String(e.note) : ""
+  };
+}
+
+/* ================================================================
+   3. PERSISTENCE  (localStorage + IndexedDB fallback + import/export)
+   ================================================================ */
+let saveTimer = null;
+function persist(){
+  // debounce a touch to avoid thrashing during rapid logging
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(persistNow, 120);
+}
+function persistNow(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    state._portraitsInIDB = false;
+  }catch(err){
+    // Quota exceeded (usually large images) -> offload portraits to IndexedDB
+    if(isQuotaError(err)){
+      idbSet("portraits", state.portraits).then(()=>{
+        const lite = Object.assign({}, state, { portraits:{}, _portraitsInIDB:true });
+        try{ localStorage.setItem(LS_KEY, JSON.stringify(lite)); state._portraitsInIDB = true; }
+        catch(e2){ toast("Storage full — export a backup to be safe.", "warn"); }
+      }).catch(()=> toast("Could not store images locally. Export a backup.", "warn"));
+    }else{
+      toast("Auto-save failed: "+err.message, "warn");
+    }
+  }
+}
+
+function isQuotaError(e){
+  return e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014 || /quota/i.test(e.message||""));
+}
+
+/* --- Minimal IndexedDB helper (single object store) --- */
+let _idb = null;
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    if(_idb) return res(_idb);
+    if(!window.indexedDB) return rej(new Error("no idb"));
+    const req = indexedDB.open("gotham_protocol", 1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore("kv");
+    req.onsuccess = ()=>{ _idb = req.result; res(_idb); };
+    req.onerror = ()=> rej(req.error);
+  });
+}
+function idbSet(key,val){
+  return idbOpen().then(db => new Promise((res,rej)=>{
+    const tx = db.transaction("kv","readwrite");
+    tx.objectStore("kv").put(val,key);
+    tx.oncomplete = res; tx.onerror = ()=> rej(tx.error);
+  }));
+}
+function idbGet(key){
+  return idbOpen().then(db => new Promise((res,rej)=>{
+    const tx = db.transaction("kv","readonly");
+    const r = tx.objectStore("kv").get(key);
+    r.onsuccess = ()=> res(r.result); r.onerror = ()=> rej(r.error);
+  }));
+}
+
+/* --- Export / Import --- */
+function exportBackup(){
+  const data = JSON.stringify(state, null, 2);
+  downloadBlob(new Blob([data], {type:"application/json"}), "gotham-protocol-backup-"+stamp()+".json");
+  toast("Backup exported.", "ok");
+}
+function importBackup(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const obj = JSON.parse(e.target.result);
+      if(!obj || typeof obj !== "object" || (!obj.history && !obj.config))
+        throw new Error("Not a Gotham Protocol backup.");
+      state = hydrate(obj);
+      persistNow();
+      applyGlobalSettings();
+      renderAll();
+      toast("Backup imported. Welcome back.", "ok");
+    }catch(err){ toast("Import failed: "+err.message, "warn"); }
+  };
+  reader.readAsText(file);
+}
+
+/* --- Standalone copy: bake current state into a fresh HTML file --- */
+async function downloadStandalone(){
+  await ensurePortraitsHydrated();
+  const clone = document.documentElement.cloneNode(true);
+  // wipe rendered dynamic content so the file is clean (it re-renders from state on open)
+  clone.querySelectorAll("[data-dynamic]").forEach(el => el.innerHTML = "");
+  clone.querySelector("#modal-root").innerHTML = "";
+  clone.querySelector("#modal-root").classList.remove("open");
+  clone.querySelector("#toast-container").innerHTML = "";
+  const baked = clone.querySelector("#__BAKED_STATE__");
+  // escape "<" so a note containing a closing-script sequence can't break out of the tag
+  baked.textContent = JSON.stringify(state).replace(/</g, "\\u003c");
+  const html = "<!DOCTYPE html>\n" + clone.outerHTML;
+  downloadBlob(new Blob([html], {type:"text/html"}), "gotham-protocol-standalone-"+stamp()+".html");
+  toast("Standalone copy downloaded — email it to yourself.", "ok");
+}
+
+async function ensurePortraitsHydrated(){
+  if(state._portraitsInIDB && Object.keys(state.portraits).length === 0){
+    try{ const p = await idbGet("portraits"); if(p) state.portraits = p; }catch(e){}
+  }
+}
+
+/* ================================================================
+   4. MECHANICS  (XP, per-pillar levels, overall rank, streaks)
+   ================================================================ */
+// Levels are 0-indexed: everything starts at level 0, so a fresh overall level = 0.
+// XP to go from level L to L+1 = round(base * growth^L)  ->  L0->1 = 80, L1->2 = 94, ...
+function xpToNext(level){
+  const c = state.config.xpCurve;
+  return Math.max(1, Math.round(c.base * Math.pow(c.growth, level)));
+}
+// Resolve a level + carried remainder from a lifetime XP total
+function levelFromTotal(total){
+  let level = 0, xp = Math.max(0, total);
+  while(xp >= xpToNext(level)){ xp -= xpToNext(level); level++; if(level > 9999) break; }
+  return { level, xp, need: xpToNext(level) };
+}
+function pillarTotalXP(pillarId){
+  let t = 0;
+  for(const h of state.history) if(h.pillar === pillarId) t += Number(h.xp) || 0;
+  return t;
+}
+// Recompute every pillar's level/xp/lastActivity from history — always exact.
+function recompute(){
+  for(const p of state.config.pillars){
+    const r = levelFromTotal(pillarTotalXP(p.id));
+    const entries = state.history.filter(h => h.pillar === p.id);
+    state.pillars[p.id] = {
+      xp: r.xp,
+      level: r.level,
+      lastActivity: entries.length ? Math.max.apply(null, entries.map(e => e.ts)) : null
+    };
+  }
+}
+function overallLevel(){
+  return state.config.pillars.reduce((s,p) => s + (state.pillars[p.id]?.level ?? 0), 0);
+}
+function currentRankIndex(){
+  const ol = overallLevel();
+  let idx = 0;
+  const ranks = state.config.ranks;
+  for(let i=0;i<ranks.length;i++){ if(ol >= ranks[i].threshold) idx = i; }
+  return idx;
+}
+function nextRank(){
+  const ranks = state.config.ranks;
+  const idx = currentRankIndex();
+  return idx + 1 < ranks.length ? ranks[idx+1] : null;
+}
+// Progress to next OVERALL level = the pillar closest to leveling (overall level ticks up the moment any pillar does)
+function progressToNextOverall(){
+  let best = 0, lead = null;
+  for(const p of state.config.pillars){
+    const st = state.pillars[p.id];
+    const frac = st.xp / xpToNext(st.level);
+    if(frac >= best){ best = frac; lead = p; }
+  }
+  return { frac: Math.min(0.999, best), lead };
+}
+function lifetimeXP(){ return state.history.reduce((s,h)=> s + (Number(h.xp)||0), 0); }
+
+// Streak: consecutive days (ending today or yesterday) with >=1 log. Encouraging only.
+function computeStreak(){
+  if(state.history.length === 0) return 0;
+  const days = new Set(state.history.map(h => dayKey(h.ts)));
+  let streak = 0;
+  let d = new Date(); d.setHours(0,0,0,0);
+  if(!days.has(dayKey(d.getTime()))) d.setDate(d.getDate() - 1); // grace: today not yet logged
+  while(days.has(dayKey(d.getTime()))){ streak++; d.setDate(d.getDate() - 1); }
+  return streak;
+}
+
+// Snapshot for detecting level-ups / rank-ups after a change
+function snapshot(){
+  const pl = {};
+  state.config.pillars.forEach(p => pl[p.id] = state.pillars[p.id]?.level ?? 0);
+  return { pillarLevels: pl, overall: overallLevel(), tier: currentRankIndex() };
+}
+
+/* ---- Logging ---- */
+function addLog(pillarId, action, xp, note){
+  const before = snapshot();
+  state.history.push({ id:uid(), ts:Date.now(), pillar:pillarId, action, xp:Number(xp)||0, note:note||"" });
+  commit(before, { celebrate:true, pillarId });
+}
+function editLog(id, patch){
+  const e = state.history.find(h => h.id === id);
+  if(!e) return;
+  Object.assign(e, patch);
+  const before = snapshot();
+  commit(before, { celebrate:false });
+}
+function deleteLog(id){
+  state.history = state.history.filter(h => h.id !== id);
+  const before = snapshot();
+  commit(before, { celebrate:false });
+}
+
+// Apply a change: recompute, detect events, persist, render, fire effects
+function commit(before, opts){
+  recompute();
+  persist();
+  const after = snapshot();
+  renderAll();
+  if(opts && opts.celebrate){
+    // per-pillar level-ups
+    for(const p of state.config.pillars){
+      if(after.pillarLevels[p.id] > before.pillarLevels[p.id]){
+        effectLevelUp(p, after.pillarLevels[p.id]);
+      }
+    }
+    // rank-up (only when moving to a higher tier)
+    if(after.tier > before.tier){
+      effectRankUp(state.config.ranks[after.tier]);
+    }
+  }
+}
+
+/* ================================================================
+   5. RENDER
+   ================================================================ */
+function renderAll(){
+  renderHeader();
+  renderProfile();
+  renderPillars();
+  renderHistory();
+  renderStats();
+  renderSettings();
+}
+
+function renderHeader(){
+  $("#app-title").textContent = state.config.appName;
+  document.title = state.config.appName;
+  $("#emblem-slot").innerHTML = ICONS.bat;
+  const now = new Date();
+  $("#header-date").innerHTML = now.toLocaleDateString(undefined,{weekday:"long"}).toUpperCase()
+    + " &middot; <b>" + now.toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"}) + "</b>";
+}
+
+function renderProfile(){
+  const idx = currentRankIndex();
+  const rank = state.config.ranks[idx];
+  const nxt = nextRank();
+  const prog = progressToNextOverall();
+  const streak = computeStreak();
+  const aura = rank.aura || "#ff2537";
+  const panel = $("#profile-panel");
+  panel.style.setProperty("--aura", aura);
+
+  const portrait = state.portraits[idx];
+  const portraitHTML = portrait
+    ? '<div class="portrait-frame"><img src="'+portrait+'" alt="Portrait for rank '+esc(rank.title)+'"></div>'
+    : '<div class="portrait-frame"><div class="portrait-placeholder">'+ICONS.bat+'<span class="ph-tier">'+esc(rank.title)+'</span></div></div>';
+
+  const flavor = FLAVOR_LINES[ idx % FLAVOR_LINES.length ];
+
+  panel.innerHTML =
+    '<div class="portrait-wrap">'+
+      '<canvas class="portrait-smoke" aria-hidden="true"></canvas>'+
+      '<div class="portrait-aura"></div>'+
+      portraitHTML+
+      '<div class="portrait-ring"></div>'+
+      '<button class="btn ghost sm portrait-upload" id="btn-portrait-upload" aria-label="Upload portrait for this rank">Upload</button>'+
+    '</div>'+
+    '<div class="rank-tier-label">RANK TIER '+idx+'</div>'+
+    '<div class="rank-title">'+esc(rank.title)+'</div>'+
+    '<div class="overall-block">'+
+      '<div class="overall-row"><span class="lbl">Overall Level</span><span class="lvl">'+overallLevel()+'</span></div>'+
+      '<div class="bar pulse" style="--barc:'+aura+'"><div class="fill" style="width:'+(prog.frac*100).toFixed(1)+'%"></div><div class="segments"></div></div>'+
+      '<div class="mini-stats">'+
+        '<span>'+ (nxt ? 'NEXT: <b>'+esc(nxt.title)+'</b> @ Lv '+nxt.threshold : '<b>MAX RANK</b>') +'</span>'+
+        '<span>Lifetime <b>'+fmt(lifetimeXP())+'</b> XP</span>'+
+      '</div>'+
+    '</div>'+
+    '<div><span class="streak-badge">'+
+      '<span class="flame">'+ICONS.flame+'</span>'+
+      '<span class="n">'+streak+'</span>'+
+      '<span class="t">DAY<br>STREAK</span>'+
+    '</span></div>'+
+    '<div class="flavor">"'+esc(flavor)+'"</div>';
+
+  $("#btn-portrait-upload").addEventListener("click", ()=> uploadPortrait(idx));
+  initPortraitSmoke();   // (re)start localized smoke on the freshly-rendered portrait
+}
+
+function renderPillars(){
+  const grid = $("#pillar-grid");
+  grid.innerHTML = "";
+  let ci = 0;
+  for(const p of state.config.pillars){
+    const st = state.pillars[p.id];
+    const need = xpToNext(st.level);
+    const frac = Math.min(1, st.xp / need);
+    const card = document.createElement("div");
+    card.className = "panel pillar-card";
+    card.style.setProperty("--pc", p.accent);
+    card.style.animationDelay = (ci * 0.7).toFixed(2) + "s";   // stagger the aura pulse
+    ci++;
+    card.dataset.pillar = p.id;
+    card.innerHTML =
+      '<div class="glowline"></div>'+
+      '<div class="pc-head">'+
+        '<div class="pc-icon">'+(ICONS[p.icon]||ICONS.star)+'</div>'+
+        '<div class="pc-title"><div class="name">'+esc(p.name)+'</div><div class="theme">'+esc(p.theme)+'</div></div>'+
+        '<div class="pc-level"><div class="lv-num">'+st.level+'</div><div class="lv-lbl">Level</div></div>'+
+      '</div>'+
+      '<div class="pc-barrow">'+
+        '<div class="bar pulse" style="--barc:'+p.accent+'"><div class="fill" style="width:'+(frac*100).toFixed(1)+'%"></div><div class="segments"></div></div>'+
+        '<div class="pc-xp"><span>'+fmt(st.xp)+' / '+fmt(need)+' XP</span><span>'+Math.floor(frac*100)+'%</span></div>'+
+      '</div>'+
+      '<div class="pc-actions">'+
+        p.actions.map((a,i)=> '<button class="log-btn" data-pillar="'+p.id+'" data-action="'+i+'">'+esc(a.label)+' <span class="xp">+'+a.xp+'</span></button>').join("")+
+      '</div>'+
+      '<div class="pc-foot">'+
+        '<span class="last">Last: <b>'+ (st.lastActivity ? relTime(st.lastActivity) : "never") +'</b></span>'+
+        '<span>'+ state.history.filter(h=>h.pillar===p.id).length +' logs</span>'+
+      '</div>';
+    grid.appendChild(card);
+  }
+  // wire quick-log buttons
+  grid.querySelectorAll(".log-btn").forEach(btn => {
+    btn.addEventListener("click", ()=>{
+      const p = state.config.pillars.find(x => x.id === btn.dataset.pillar);
+      const a = p.actions[Number(btn.dataset.action)];
+      addLog(p.id, a.label, a.xp);
+      ping();
+    });
+  });
+}
+
+function pillarById(id){ return state.config.pillars.find(p => p.id === id); }
+
+function renderHistory(){
+  // (re)build pillar filter options
+  const sel = $("#hist-filter-pillar");
+  if(sel.options.length !== state.config.pillars.length + 1){
+    sel.innerHTML = '<option value="all">All pillars</option>' +
+      state.config.pillars.map(p => '<option value="'+p.id+'">'+esc(p.name)+'</option>').join("");
+    sel.value = ui.histFilter.pillar;
+  }
+  const tl = $("#timeline");
+  let items = state.history.slice().sort((a,b)=> b.ts - a.ts);
+  const f = ui.histFilter;
+  if(f.pillar !== "all") items = items.filter(h => h.pillar === f.pillar);
+  if(f.from){ const t = new Date(f.from+"T00:00:00").getTime(); items = items.filter(h => h.ts >= t); }
+  if(f.to){ const t = new Date(f.to+"T23:59:59").getTime(); items = items.filter(h => h.ts <= t); }
+
+  if(items.length === 0){ tl.innerHTML = '<div class="empty">No entries yet. Log an action to begin your protocol.</div>'; return; }
+
+  tl.innerHTML = items.map(h => {
+    const p = pillarById(h.pillar);
+    const acc = p ? p.accent : "#888";
+    return '<div class="log-item" style="--pc:'+acc+'" data-id="'+h.id+'">'+
+      '<span class="log-dot"></span>'+
+      '<div class="log-main">'+
+        '<div class="action">'+esc(h.action)+'</div>'+
+        '<div class="meta">'+(p?esc(p.name):"?")+' &middot; '+fullTime(h.ts)+'</div>'+
+        (h.note ? '<div class="note">'+esc(h.note)+'</div>' : '')+
+      '</div>'+
+      '<div class="log-xp">+'+h.xp+'</div>'+
+      '<div class="log-tools">'+
+        '<button class="icon-btn" data-edit="'+h.id+'" aria-label="Edit entry">'+ICONS.edit+'</button>'+
+        '<button class="icon-btn danger" data-del="'+h.id+'" aria-label="Delete entry">'+ICONS.trash+'</button>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+
+  tl.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", ()=> openEditLog(b.dataset.edit)));
+  tl.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", ()=> {
+    confirmAction("Delete entry?", "This removes the log and recomputes your XP and levels. This cannot be undone.", ()=>{
+      deleteLog(b.dataset.del); toast("Entry deleted.", "ok");
+    });
+  }));
+}
+
+/* ---- STATS (hand-rolled SVG, no libraries) ---- */
+function renderStats(){
+  const grid = $("#stats-grid");
+  grid.innerHTML =
+    '<div class="panel chart-card"><h3>XP per Pillar (lifetime)</h3>'+chartXPPerPillar()+'</div>'+
+    '<div class="panel chart-card"><h3>Levels</h3>'+chartLevels()+'</div>'+
+    '<div class="panel chart-card" style="grid-column:1/-1"><h3>Activity — last 30 days</h3>'+chartHeatmap()+'</div>';
+}
+
+function chartXPPerPillar(){
+  const data = state.config.pillars.map(p => ({ name:p.name, v:pillarTotalXP(p.id), c:p.accent }));
+  const max = Math.max(1, ...data.map(d => d.v));
+  const rowH = 34, w = 100;
+  let y = 6;
+  let svg = '<svg viewBox="0 0 '+w+' '+(data.length*rowH+6)+'" width="100%" preserveAspectRatio="none" role="img" aria-label="XP per pillar bar chart">';
+  for(const d of data){
+    const bw = (d.v/max)*72;
+    svg += '<text x="0" y="'+(y+9)+'" fill="#8b93a8" font-size="4.2" font-family="monospace">'+esc(d.name)+'</text>';
+    svg += '<rect x="0" y="'+(y+11)+'" width="72" height="7" rx="2" fill="rgba(255,255,255,0.05)"/>';
+    svg += '<rect x="0" y="'+(y+11)+'" width="'+bw+'" height="7" rx="2" fill="'+d.c+'"><animate attributeName="width" from="0" to="'+bw+'" dur="0.7s" fill="freeze"/></rect>';
+    svg += '<text x="74" y="'+(y+17)+'" fill="#e9edf6" font-size="4.6" font-family="monospace">'+fmt(d.v)+'</text>';
+    y += rowH;
+  }
+  return svg + '</svg>';
+}
+
+function chartLevels(){
+  const data = state.config.pillars.map(p => ({ name:p.name, v:state.pillars[p.id].level, c:p.accent }));
+  const max = Math.max(1, ...data.map(d => d.v));
+  const n = data.length, gap = 6, bw = (100 - gap*(n+1)) / n, H = 90;
+  let svg = '<svg viewBox="0 0 100 110" width="100%" role="img" aria-label="Level per pillar bar chart">';
+  data.forEach((d,i)=>{
+    const x = gap + i*(bw+gap);
+    const bh = (d.v/max)*H;
+    svg += '<rect x="'+x+'" y="'+(H-bh+4)+'" width="'+bw+'" height="'+bh+'" rx="1.5" fill="'+d.c+'"><animate attributeName="height" from="0" to="'+bh+'" dur="0.7s" fill="freeze"/><animate attributeName="y" from="'+(H+4)+'" to="'+(H-bh+4)+'" dur="0.7s" fill="freeze"/></rect>';
+    svg += '<text x="'+(x+bw/2)+'" y="'+(H-bh)+'" fill="#e9edf6" font-size="5" font-family="monospace" text-anchor="middle">'+d.v+'</text>';
+    svg += '<text x="'+(x+bw/2)+'" y="'+(H+9)+'" fill="#8b93a8" font-size="3.4" font-family="monospace" text-anchor="middle">'+esc(d.name.split(" ").pop())+'</text>';
+  });
+  return svg + '</svg>';
+}
+
+function chartHeatmap(){
+  const days = 30, cols = 30;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const counts = [];
+  let maxC = 1;
+  for(let i=days-1;i>=0;i--){
+    const d = new Date(today); d.setDate(d.getDate()-i);
+    const key = dayKey(d.getTime());
+    const c = state.history.filter(h => dayKey(h.ts) === key).length;
+    counts.push({ d:new Date(d), c });
+    if(c > maxC) maxC = c;
+  }
+  const cell = 3.0, gap = 0.5, w = cols*(cell+gap);
+  let svg = '<svg viewBox="0 0 '+w+' 16" width="100%" role="img" aria-label="Activity heatmap for last 30 days">';
+  counts.forEach((it,i)=>{
+    const intensity = it.c === 0 ? 0 : 0.25 + 0.75*(it.c/maxC);
+    const fill = it.c === 0 ? "rgba(255,255,255,0.05)" : "color-mix(in srgb, var(--accent) "+Math.round(intensity*100)+"%, transparent)";
+    const x = i*(cell+gap);
+    svg += '<rect x="'+x+'" y="4" width="'+cell+'" height="'+cell+'" rx="0.6" fill="'+fill+'"><title>'+it.d.toLocaleDateString()+': '+it.c+' logs</title></rect>';
+  });
+  svg += '</svg>';
+  svg += '<div class="heat-legend">less <span class="sw" style="background:rgba(255,255,255,0.05)"></span><span class="sw" style="background:color-mix(in srgb,var(--accent) 40%,transparent)"></span><span class="sw" style="background:color-mix(in srgb,var(--accent) 70%,transparent)"></span><span class="sw" style="background:var(--accent)"></span> more</div>';
+  return svg;
+}
+
+/* ================================================================
+   6. EVENTS
+   ================================================================ */
+function bindEvents(){
+  // Tabs
+  $$(".tab").forEach(t => t.addEventListener("click", ()=> switchView(t.dataset.view)));
+  // Header actions
+  $("#btn-export").addEventListener("click", exportBackup);
+  $("#btn-import").addEventListener("click", ()=> $("#file-import").click());
+  $("#btn-standalone").addEventListener("click", downloadStandalone);
+  $("#btn-reset").addEventListener("click", ()=>{
+    confirmAction("Reset everything?", "This erases all pillars progress, history, portraits and settings, returning to defaults. Export a backup first if unsure.", ()=>{
+      state = defaultState(); persistNow(); applyGlobalSettings(); renderAll(); toast("Protocol reset.", "ok");
+    });
+  });
+  // Custom log
+  $("#btn-custom-log").addEventListener("click", openCustomLog);
+  // File inputs
+  $("#file-import").addEventListener("change", e => { if(e.target.files[0]) importBackup(e.target.files[0]); e.target.value=""; });
+  // History filters
+  $("#hist-filter-pillar").addEventListener("change", e => { ui.histFilter.pillar = e.target.value; renderHistory(); });
+  $("#hist-from").addEventListener("change", e => { ui.histFilter.from = e.target.value; renderHistory(); });
+  $("#hist-to").addEventListener("change", e => { ui.histFilter.to = e.target.value; renderHistory(); });
+  $("#hist-clear").addEventListener("click", ()=>{
+    ui.histFilter = {pillar:"all",from:"",to:""};
+    $("#hist-filter-pillar").value="all"; $("#hist-from").value=""; $("#hist-to").value="";
+    renderHistory();
+  });
+  // Global keyboard: Escape closes modal
+  document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(); });
+}
+
+function switchView(view){
+  ui.view = view;
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === view));
+  $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-"+view));
+}
+
+/* ---- Custom log modal ---- */
+function openCustomLog(){
+  const opts = state.config.pillars.map(p => '<option value="'+p.id+'">'+esc(p.name)+'</option>').join("");
+  openModal(
+    "Custom Log",
+    "Record any action against a pillar.",
+    '<div class="form-col">'+
+      '<label class="field">Pillar<select id="cl-pillar">'+opts+'</select></label>'+
+      '<label class="field">Action<input id="cl-action" type="text" placeholder="e.g. Sparring session" maxlength="80"></label>'+
+      '<label class="field">XP<input id="cl-xp" type="number" value="30" min="1" max="100000"></label>'+
+      '<label class="field">Note (optional)<textarea id="cl-note" rows="2" maxlength="240" placeholder="Context, how it felt..."></textarea></label>'+
+    '</div>',
+    [
+      {label:"Cancel", cls:"ghost", act:closeModal},
+      {label:"Log it", cls:"accent", act:()=>{
+        const pid = $("#cl-pillar").value;
+        const action = $("#cl-action").value.trim() || "Custom log";
+        const xp = Math.max(1, Number($("#cl-xp").value)||0);
+        const note = $("#cl-note").value.trim();
+        closeModal();
+        addLog(pid, action, xp, note);
+        ping();
+      }}
+    ]
+  );
+  setTimeout(()=> $("#cl-action") && $("#cl-action").focus(), 50);
+}
+
+/* ---- Edit log modal ---- */
+function openEditLog(id){
+  const e = state.history.find(h => h.id === id);
+  if(!e) return;
+  const opts = state.config.pillars.map(p => '<option value="'+p.id+'"'+(p.id===e.pillar?" selected":"")+'>'+esc(p.name)+'</option>').join("");
+  openModal(
+    "Edit Entry",
+    "Adjust this log. XP and levels recompute automatically.",
+    '<div class="form-col">'+
+      '<label class="field">Pillar<select id="el-pillar">'+opts+'</select></label>'+
+      '<label class="field">Action<input id="el-action" type="text" value="'+esc(e.action)+'" maxlength="80"></label>'+
+      '<label class="field">XP<input id="el-xp" type="number" value="'+e.xp+'" min="0" max="100000"></label>'+
+      '<label class="field">Note<textarea id="el-note" rows="2" maxlength="240">'+esc(e.note||"")+'</textarea></label>'+
+    '</div>',
+    [
+      {label:"Cancel", cls:"ghost", act:closeModal},
+      {label:"Save", cls:"accent", act:()=>{
+        editLog(id, {
+          pillar: $("#el-pillar").value,
+          action: $("#el-action").value.trim() || "Log",
+          xp: Math.max(0, Number($("#el-xp").value)||0),
+          note: $("#el-note").value.trim()
+        });
+        closeModal(); toast("Entry updated.", "ok");
+      }}
+    ]
+  );
+}
+
+/* ================================================================
+   7. EFFECTS  (fog, sound, level-up, rank-up)
+   ================================================================ */
+let motionOn = true;
+function motionAllowed(){
+  const prefersReduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return state.settings.motion && !prefersReduce;
+}
+
+/* --- Fog canvas --- */
+let fogCtx, fogBlobs = [], fogRAF = null, fogW = 0, fogH = 0;
+function initFog(){
+  const c = $("#fog");
+  fogCtx = c.getContext("2d");
+  const resize = ()=>{
+    fogW = c.width = window.innerWidth;
+    fogH = c.height = window.innerHeight;
+  };
+  resize();
+  window.addEventListener("resize", resize);
+  const colors = ["255,37,55","120,120,132","150,22,30"];   // red / grey / deep-red night haze
+  fogBlobs = [];
+  for(let i=0;i<7;i++){
+    fogBlobs.push({
+      x:Math.random()*fogW, y:Math.random()*fogH,
+      r:180+Math.random()*260,
+      vx:(Math.random()-0.5)*0.16, vy:(Math.random()-0.5)*0.12,
+      col:colors[i%colors.length], a:0.05+Math.random()*0.06
+    });
+  }
+  startFog();
+}
+function drawFog(){
+  fogCtx.clearRect(0,0,fogW,fogH);
+  fogCtx.globalCompositeOperation = "lighter";
+  for(const b of fogBlobs){
+    const g = fogCtx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r);
+    g.addColorStop(0,"rgba("+b.col+","+b.a+")");
+    g.addColorStop(1,"rgba("+b.col+",0)");
+    fogCtx.fillStyle = g;
+    fogCtx.fillRect(b.x-b.r,b.y-b.r,b.r*2,b.r*2);
+    b.x += b.vx; b.y += b.vy;
+    if(b.x < -b.r) b.x = fogW+b.r; if(b.x > fogW+b.r) b.x = -b.r;
+    if(b.y < -b.r) b.y = fogH+b.r; if(b.y > fogH+b.r) b.y = -b.r;
+  }
+}
+function startFog(){
+  if(fogRAF) cancelAnimationFrame(fogRAF);
+  if(!motionAllowed()){ drawFog(); return; }   // static single frame
+  const loop = ()=>{ drawFog(); fogRAF = requestAnimationFrame(loop); };
+  loop();
+}
+
+/* --- Portrait smoke: white smoke curling OFF THE OUTLINE (perimeter) of the portrait --- */
+let smokeRAF = null, smokeParts = [], smokeCtx = null, smokeCanvas = null, smokeW = 0, smokeH = 0;
+// The portrait sits centered in the canvas, inset by the CSS margins (50px all sides).
+const SMK = { padX:50, padTop:50, padBottom:50 };
+// Pick a spawn point on the portrait's outline + an outward/upward launch vector.
+function smokeEdge(){
+  const x0 = SMK.padX, y0 = SMK.padTop, x1 = smokeW - SMK.padX, y1 = smokeH - SMK.padBottom;
+  const r = Math.random();
+  if(r < 0.42){        // top edge -> straight up
+    return { x:x0 + Math.random()*(x1-x0), y:y0, nx:(Math.random()-0.5)*0.5, ny:-1 };
+  } else if(r < 0.71){ // left edge -> out to the left + up
+    return { x:x0, y:y0 + Math.random()*(y1-y0)*0.85, nx:-1, ny:-0.35 };
+  } else {             // right edge -> out to the right + up
+    return { x:x1, y:y0 + Math.random()*(y1-y0)*0.85, nx:1, ny:-0.35 };
+  }
+}
+function makeSmoke(seed){
+  const e = smokeEdge();
+  const life = 2200 + Math.random()*2600;
+  const spd = 0.13 + Math.random()*0.2;
+  return {
+    x: e.x, y: e.y,
+    r: 5 + Math.random()*10,
+    vx: e.nx*spd + (Math.random()-0.5)*0.05,
+    vy: e.ny*spd - (0.04 + Math.random()*0.09),   // extra buoyant rise
+    life, age: seed ? Math.random()*life : 0
+  };
+}
+function initPortraitSmoke(){
+  if(smokeRAF){ cancelAnimationFrame(smokeRAF); smokeRAF = null; }
+  const cv = document.querySelector(".portrait-smoke");
+  if(!cv || !cv.getContext) return;
+  smokeCanvas = cv; smokeCtx = cv.getContext("2d");
+  const rect = cv.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  smokeW = Math.max(60, rect.width); smokeH = Math.max(80, rect.height);
+  cv.width = Math.round(smokeW * dpr); cv.height = Math.round(smokeH * dpr);
+  smokeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // seed across their lifetimes so the effect starts full (no empty->fill flash on re-render)
+  smokeParts = [];
+  for(let i=0;i<34;i++) smokeParts.push(makeSmoke(true));
+  if(!motionAllowed()){ stepSmoke(); return; }   // single static frame
+  const loop = ()=>{ stepSmoke(); smokeRAF = requestAnimationFrame(loop); };
+  loop();
+}
+function stepSmoke(){
+  if(!smokeCtx) return;
+  smokeCtx.clearRect(0, 0, smokeW, smokeH);
+  smokeCtx.globalCompositeOperation = "lighter";   // white wisps build luminously against the dark
+  for(const p of smokeParts){
+    p.age += 16; p.x += p.vx; p.y += p.vy; p.r += 0.06; p.vy -= 0.0006;   // gentle acceleration upward
+    const t = p.age / p.life;
+    if(t >= 1){ Object.assign(p, makeSmoke(false)); continue; }
+    const a = Math.sin(Math.min(1, t) * Math.PI) * 0.16;   // fade in then out
+    const g = smokeCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    g.addColorStop(0,   "rgba(255,255,255," + a.toFixed(3) + ")");
+    g.addColorStop(0.5, "rgba(226,228,235," + (a*0.55).toFixed(3) + ")");
+    g.addColorStop(1,   "rgba(255,255,255,0)");
+    smokeCtx.fillStyle = g;
+    smokeCtx.beginPath(); smokeCtx.arc(p.x, p.y, p.r, 0, 6.2832); smokeCtx.fill();
+  }
+  smokeCtx.globalCompositeOperation = "source-over";
+}
+
+/* --- WebAudio (generated, no files) --- */
+let audioCtx = null;
+function audio(){ if(!audioCtx && window.AudioContext) audioCtx = new AudioContext(); return audioCtx; }
+function ping(){
+  if(!state.settings.sound) return;
+  const a = audio(); if(!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = "triangle"; o.frequency.value = 660;
+  o.connect(g); g.connect(a.destination);
+  g.gain.setValueAtTime(0.0001, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.15, a.currentTime+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime+0.18);
+  o.frequency.exponentialRampToValueAtTime(990, a.currentTime+0.12);
+  o.start(); o.stop(a.currentTime+0.2);
+}
+function stinger(){
+  if(!state.settings.sound) return;
+  const a = audio(); if(!a) return;
+  const t = a.currentTime;
+  [110,164.8,220,329.6].forEach((f,i)=>{
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = i>2 ? "sawtooth" : "triangle"; o.frequency.value = f;
+    o.connect(g); g.connect(a.destination);
+    const st = t + i*0.09;
+    g.gain.setValueAtTime(0.0001, st);
+    g.gain.exponentialRampToValueAtTime(0.18, st+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, st+0.9);
+    o.start(st); o.stop(st+0.95);
+  });
+}
+
+/* --- Level-up: card flash + toast + bar surge --- */
+// Level-up color escalates by the level reached: deep crimson at low levels -> hot red high up.
+// So each level-up is a different shade, never the same flat color.
+function levelShade(level){
+  const t = Math.min(1, Math.max(0, (level - 1) / 16));   // ramp over the first ~16 levels
+  const hue = (352 + t * 10) % 360;                       // 352 (deep) -> 2 (pure red)
+  const sat = 70 + t * 25;                                // 70% -> 95%
+  const light = 38 + t * 30;                              // 38% -> 68% (dim -> bright)
+  return "hsl(" + hue.toFixed(0) + " " + sat.toFixed(0) + "% " + light.toFixed(0) + "%)";
+}
+function effectLevelUp(pillar, newLevel){
+  ping();
+  const shade = levelShade(newLevel);
+  const card = $('.pillar-card[data-pillar="'+pillar.id+'"]');
+  if(card && motionAllowed()){
+    card.style.setProperty("--flash", shade);
+    card.classList.remove("levelup"); void card.offsetWidth; card.classList.add("levelup");
+    const bar = card.querySelector(".bar");
+    if(bar){ bar.classList.add("surge"); setTimeout(()=> bar.classList.remove("surge"), 700); }
+    // clear after the flash so the steady card-aura pulse resumes
+    setTimeout(()=>{ card.classList.remove("levelup"); card.style.removeProperty("--flash"); }, 1050);
+  }
+  toast('<b>'+esc(pillar.name)+'</b> reached <b>Level '+newLevel+'</b>', "levelup", shade);
+}
+
+/* --- Rank-up: cinematic bat-signal sweep --- */
+function effectRankUp(rank){
+  stinger();
+  const ov = $("#rankup-overlay");
+  ov.style.setProperty("--aura", rank.aura || "#ff2537");
+  if(!motionAllowed()){
+    toast('<b>RANK UP</b> — you are now <b>'+esc(rank.title)+'</b>', "levelup");
+    return;
+  }
+  ov.innerHTML =
+    '<div class="ru-dim"></div>'+
+    '<div class="ru-glitch"></div>'+
+    '<div class="ru-beam"></div>'+
+    '<div class="ru-signal">'+ICONS.bat+'</div>'+
+    '<div class="ru-text"><div class="k">Rank Ascended</div><div class="title">'+esc(rank.title)+'</div></div>';
+  ov.classList.add("play");
+  setTimeout(()=>{ ov.classList.remove("play"); ov.innerHTML=""; }, 3400);
+}
+
+/* ================================================================
+   8. SETTINGS  (rename/recolor/reorder pillars, ranks, curve, images)
+   ================================================================ */
+function renderSettings(){
+  const g = $("#settings-grid");
+  g.innerHTML =
+    settingsGeneral() +
+    settingsPillars() +
+    settingsRanks() +
+    settingsCurve() +
+    settingsData();
+  wireSettings();
+}
+
+function settingsGeneral(){
+  const s = state.settings;
+  const swatches = ACCENT_CHOICES.map(c =>
+    '<span class="accent-swatch'+(s.accent===c?" active":"")+'" data-accent="'+c+'" style="background:'+c+';color:'+c+'" role="button" aria-label="Accent '+c+'"></span>'
+  ).join("");
+  return '<div class="panel setblock"><h3>General</h3>'+
+    '<label class="field" style="margin-bottom:14px">App name<input id="set-appname" type="text" value="'+esc(state.config.appName)+'" maxlength="40"></label>'+
+    '<div style="font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Theme accent</div>'+
+    '<div class="accent-picker" style="margin-bottom:8px">'+swatches+'</div>'+
+    '<div class="toggle-row"><div><div>Motion &amp; effects</div><div class="desc">Fog, bar pulse, level-up &amp; rank-up cinematics.</div></div>'+
+      '<label class="switch"><input type="checkbox" id="set-motion" '+(s.motion?"checked":"")+'><span class="slider"></span></label></div>'+
+    '<div class="toggle-row"><div><div>Sound</div><div class="desc">Subtle UI ticks and a rank-up stinger (WebAudio).</div></div>'+
+      '<label class="switch"><input type="checkbox" id="set-sound" '+(s.sound?"checked":"")+'><span class="slider"></span></label></div>'+
+    '</div>';
+}
+
+function settingsPillars(){
+  let html = '<div class="panel setblock"><h3>Pillars</h3>';
+  state.config.pillars.forEach((p,pi)=>{
+    const iconOpts = PILLAR_ICON_CHOICES.map(ic => '<option value="'+ic+'"'+(p.icon===ic?" selected":"")+'>'+ic+'</option>').join("");
+    html += '<div class="set-pillar" data-pi="'+pi+'">'+
+      '<div class="row1">'+
+        '<div class="reorder"><button class="btn ghost" data-move="up" data-pi="'+pi+'" aria-label="Move up">&#9650;</button><button class="btn ghost" data-move="down" data-pi="'+pi+'" aria-label="Move down">&#9660;</button></div>'+
+        '<label class="field" style="flex:1;text-transform:none">Name<input class="p-name" data-pi="'+pi+'" type="text" value="'+esc(p.name)+'" maxlength="30"></label>'+
+        '<label class="field" style="text-transform:none">Theme<input class="p-theme" data-pi="'+pi+'" type="text" value="'+esc(p.theme)+'" maxlength="30"></label>'+
+        '<label class="field" style="text-transform:none">Icon<select class="p-icon" data-pi="'+pi+'">'+iconOpts+'</select></label>'+
+        '<label class="field" style="text-transform:none">Color<input class="p-accent" data-pi="'+pi+'" type="color" value="'+p.accent+'"></label>'+
+      '</div>'+
+      '<div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Quick-log actions</div>'+
+      '<div class="set-actions-list">'+
+        p.actions.map((a,ai)=>
+          '<div class="set-action-row">'+
+            '<input class="a-name" data-pi="'+pi+'" data-ai="'+ai+'" type="text" value="'+esc(a.label)+'" maxlength="40">'+
+            '<input class="a-xp" data-pi="'+pi+'" data-ai="'+ai+'" type="number" value="'+a.xp+'" min="1" max="100000">'+
+            '<button class="icon-btn danger" data-delaction data-pi="'+pi+'" data-ai="'+ai+'" aria-label="Remove action">'+ICONS.trash+'</button>'+
+          '</div>'
+        ).join("")+
+      '</div>'+
+      '<button class="btn ghost sm" data-addaction data-pi="'+pi+'" style="margin-top:8px">+ Add action</button>'+
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function settingsRanks(){
+  let html = '<div class="panel setblock"><h3>Rank Ladder &amp; Portraits</h3>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Edit titles and the overall-level threshold each rank unlocks at. Upload a portrait per tier — higher tiers can be cooler images.</div>';
+  state.config.ranks.forEach((r,ri)=>{
+    const thumb = state.portraits[ri]
+      ? '<img class="rank-thumb" src="'+state.portraits[ri]+'" alt="Portrait tier '+ri+'">'
+      : '<div class="rank-thumb" style="display:flex;align-items:center;justify-content:center;color:'+(r.aura||"#888")+'">'+ICONS.bat+'</div>';
+    html += '<div class="rank-row" data-ri="'+ri+'">'+
+      '<span class="tno">'+ri+'</span>'+
+      '<input class="r-title" data-ri="'+ri+'" type="text" value="'+esc(r.title)+'" maxlength="30">'+
+      '<input class="r-threshold" data-ri="'+ri+'" type="number" value="'+r.threshold+'" min="0" max="100000" aria-label="Threshold">'+
+      thumb+
+      '<div style="display:flex;gap:4px">'+
+        '<button class="btn ghost sm" data-portrait="'+ri+'">Upload</button>'+
+        (state.portraits[ri] ? '<button class="icon-btn danger" data-portraitdel="'+ri+'" aria-label="Remove portrait">'+ICONS.trash+'</button>' : '')+
+      '</div>'+
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function settingsCurve(){
+  const c = state.config.xpCurve;
+  return '<div class="panel setblock"><h3>XP Curve</h3>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">xpToNext(L) = round(base &times; growth^L), levels 0-indexed. Higher base = slower start; higher growth = steeper climb. Preview: '+
+      'L0&rarr;1 needs <b style="color:var(--accent)">'+Math.round(c.base)+'</b>, L5&rarr;6 needs <b style="color:var(--accent)">'+Math.round(c.base*Math.pow(c.growth,5))+'</b>, L10&rarr;11 needs <b style="color:var(--accent)">'+Math.round(c.base*Math.pow(c.growth,10))+'</b> XP.</div>'+
+    '<div style="display:flex;gap:20px;flex-wrap:wrap">'+
+      '<label class="field" style="text-transform:none">Base ('+c.base+')<input id="set-base" type="range" min="20" max="300" step="5" value="'+c.base+'"></label>'+
+      '<label class="field" style="text-transform:none">Growth ('+c.growth.toFixed(2)+')<input id="set-growth" type="range" min="1.05" max="1.5" step="0.01" value="'+c.growth+'"></label>'+
+    '</div>'+
+    '<div style="margin-top:6px;font-size:11px;color:var(--muted-2)">Changing the curve recomputes all levels from your history.</div>'+
+    '</div>';
+}
+
+function settingsData(){
+  return '<div class="panel setblock"><h3>Backup &amp; Data</h3>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Your save file is portable. Export the JSON to back up, or download a standalone HTML that already contains your data — email either to yourself to continue on another machine.</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+      '<button class="btn accent sm" id="set-export">Export JSON backup</button>'+
+      '<button class="btn ghost sm" id="set-import">Import backup</button>'+
+      '<button class="btn ghost sm" id="set-standalone">Download standalone copy</button>'+
+      '<button class="btn danger sm" id="set-reset">Reset everything</button>'+
+    '</div></div>';
+}
+
+function wireSettings(){
+  // General
+  bindInput("#set-appname", "input", e => { state.config.appName = e.target.value; renderHeader(); persist(); });
+  $$(".accent-swatch").forEach(sw => sw.addEventListener("click", ()=>{
+    state.settings.accent = sw.dataset.accent; applyGlobalSettings(); persist(); renderSettings();
+  }));
+  bindInput("#set-motion", "change", e => { state.settings.motion = e.target.checked; persist(); applyGlobalSettings(); startFog(); initPortraitSmoke(); });
+  bindInput("#set-sound", "change", e => { state.settings.sound = e.target.checked; persist(); if(e.target.checked) ping(); });
+
+  // Pillars — text/number edits (live, no full re-render to keep focus)
+  $$(".p-name").forEach(i => i.addEventListener("input", e => { pAt(e).name = e.target.value; persist(); softRefresh(); }));
+  $$(".p-theme").forEach(i => i.addEventListener("input", e => { pAt(e).theme = e.target.value; persist(); softRefresh(); }));
+  $$(".p-icon").forEach(i => i.addEventListener("change", e => { pAt(e).icon = e.target.value; persist(); renderPillars(); }));
+  $$(".p-accent").forEach(i => i.addEventListener("input", e => { pAt(e).accent = e.target.value; persist(); softRefresh(); }));
+  $$(".a-name").forEach(i => i.addEventListener("input", e => { aAt(e).label = e.target.value; persist(); renderPillars(); }));
+  $$(".a-xp").forEach(i => i.addEventListener("input", e => { aAt(e).xp = Math.max(1, Number(e.target.value)||1); persist(); renderPillars(); }));
+  $$("[data-addaction]").forEach(b => b.addEventListener("click", ()=>{
+    state.config.pillars[Number(b.dataset.pi)].actions.push({label:"New action", xp:20}); persist(); renderSettings(); renderPillars();
+  }));
+  $$("[data-delaction]").forEach(b => b.addEventListener("click", ()=>{
+    const p = state.config.pillars[Number(b.dataset.pi)];
+    if(p.actions.length <= 1){ toast("Keep at least one action.", "warn"); return; }
+    p.actions.splice(Number(b.dataset.ai),1); persist(); renderSettings(); renderPillars();
+  }));
+  $$("[data-move]").forEach(b => b.addEventListener("click", ()=>{
+    const i = Number(b.dataset.pi), dir = b.dataset.move === "up" ? -1 : 1, j = i+dir;
+    const arr = state.config.pillars;
+    if(j<0 || j>=arr.length) return;
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+    persist(); renderSettings(); renderPillars();
+  }));
+
+  // Ranks
+  $$(".r-title").forEach(i => i.addEventListener("input", e => { state.config.ranks[Number(e.target.dataset.ri)].title = e.target.value; persist(); renderProfile(); }));
+  $$(".r-threshold").forEach(i => i.addEventListener("input", e => {
+    state.config.ranks[Number(e.target.dataset.ri)].threshold = Math.max(0, Number(e.target.value)||0);
+    persist(); renderProfile();
+  }));
+  $$("[data-portrait]").forEach(b => b.addEventListener("click", ()=> uploadPortrait(Number(b.dataset.portrait))));
+  $$("[data-portraitdel]").forEach(b => b.addEventListener("click", ()=>{
+    confirmAction("Remove portrait?", "This deletes the uploaded image for this rank tier.", ()=>{
+      delete state.portraits[Number(b.dataset.portraitdel)];
+      persist(); renderProfile(); renderSettings(); toast("Portrait removed.", "ok");
+    });
+  }));
+
+  // Curve
+  bindInput("#set-base", "input", e => { state.config.xpCurve.base = Number(e.target.value); recompute(); persist(); renderProfile(); renderPillars(); renderSettingsCurveOnly(); });
+  bindInput("#set-growth", "input", e => { state.config.xpCurve.growth = Number(e.target.value); recompute(); persist(); renderProfile(); renderPillars(); renderSettingsCurveOnly(); });
+
+  // Data
+  $("#set-export").addEventListener("click", exportBackup);
+  $("#set-import").addEventListener("click", ()=> $("#file-import").click());
+  $("#set-standalone").addEventListener("click", downloadStandalone);
+  $("#set-reset").addEventListener("click", ()=> $("#btn-reset").click());
+}
+
+// Live-refresh the curve block only (so range sliders keep focus while dragging)
+function renderSettingsCurveOnly(){
+  const blocks = $$("#settings-grid .setblock");
+  // curve is the 4th block
+  if(blocks[3]) blocks[3].outerHTML = settingsCurve();
+  // re-bind just those sliders
+  bindInput("#set-base", "input", e => { state.config.xpCurve.base = Number(e.target.value); recompute(); persist(); renderProfile(); renderPillars(); renderSettingsCurveOnly(); });
+  bindInput("#set-growth", "input", e => { state.config.xpCurve.growth = Number(e.target.value); recompute(); persist(); renderProfile(); renderPillars(); renderSettingsCurveOnly(); });
+}
+
+// A lightweight refresh that keeps the settings inputs but updates cards/profile
+function softRefresh(){ renderProfile(); renderPillars(); }
+
+function pAt(e){ return state.config.pillars[Number(e.target.dataset.pi)]; }
+function aAt(e){ return state.config.pillars[Number(e.target.dataset.pi)].actions[Number(e.target.dataset.ai)]; }
+function bindInput(sel, ev, fn){ const el = $(sel); if(el) el.addEventListener(ev, fn); }
+
+/* ---- Portrait upload (downscale to 512px, store base64) ---- */
+let portraitTargetTier = 0;
+function uploadPortrait(tier){
+  portraitTargetTier = tier;
+  $("#file-portrait").click();
+}
+function handlePortraitFile(file){
+  const tier = portraitTargetTier;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = ()=>{
+      const MAX = 512;
+      let w = img.width, h = img.height;
+      if(w > MAX || h > MAX){ const s = Math.min(MAX/w, MAX/h); w = Math.round(w*s); h = Math.round(h*s); }
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      let dataURL;
+      try{ dataURL = c.toDataURL("image/jpeg", 0.85); }
+      catch(err){ toast("Could not process image.", "warn"); return; }
+      state.portraits[tier] = dataURL;
+      persist();
+      renderProfile();
+      renderSettings();
+      toast("Portrait set for tier "+tier+".", "ok");
+    };
+    img.onerror = ()=> toast("That file isn't a readable image.", "warn");
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ================================================================
+   MODALS / TOASTS / CONFIRM
+   ================================================================ */
+function openModal(title, sub, bodyHTML, actions){
+  const root = $("#modal-root");
+  root.innerHTML =
+    '<div class="modal-backdrop"></div>'+
+    '<div class="modal" role="document">'+
+      '<h2>'+esc(title)+'</h2>'+
+      (sub ? '<p class="sub">'+esc(sub)+'</p>' : '')+
+      bodyHTML+
+      '<div class="actions">'+actions.map((a,i)=> '<button class="btn '+(a.cls||"")+'" data-mi="'+i+'">'+esc(a.label)+'</button>').join("")+'</div>'+
+    '</div>';
+  root.classList.add("open");
+  root.querySelector(".modal-backdrop").addEventListener("click", closeModal);
+  actions.forEach((a,i)=> root.querySelector('[data-mi="'+i+'"]').addEventListener("click", a.act));
+}
+function closeModal(){ const r = $("#modal-root"); r.classList.remove("open"); r.innerHTML = ""; }
+function confirmAction(title, msg, onYes){
+  openModal(title, "", '<p style="color:var(--muted);font-size:13px;line-height:1.6">'+esc(msg)+'</p>',
+    [ {label:"Cancel", cls:"ghost", act:closeModal},
+      {label:"Confirm", cls:"danger", act:()=>{ closeModal(); onYes(); }} ]);
+}
+
+function toast(html, kind, color){
+  const c = $("#toast-container");
+  const t = document.createElement("div");
+  t.className = "toast" + (kind==="levelup" ? " levelup" : "");
+  if(color) t.style.setProperty("--sc", color);   // per-level shade for the border/glow/star
+  t.innerHTML = (kind==="levelup" ? '<span style="color:'+(color||"var(--accent)")+'">'+ICONS.star+'</span>' : "") + '<span>'+html+'</span>';
+  c.appendChild(t);
+  setTimeout(()=>{ t.style.transition="opacity .4s, transform .4s"; t.style.opacity="0"; t.style.transform="translateY(10px)"; setTimeout(()=> t.remove(), 400); }, kind==="levelup" ? 3200 : 2400);
+}
+
+/* ================================================================
+   GLOBAL SETTINGS APPLICATION
+   ================================================================ */
+function applyGlobalSettings(){
+  document.documentElement.style.setProperty("--accent", state.settings.accent);
+  document.body.classList.toggle("reduce-motion", !motionAllowed());
+}
+
+/* ================================================================
+   HELPERS
+   ================================================================ */
+function $(s){ return document.querySelector(s); }
+function $$(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function num(v, d){ const n = Number(v); return isFinite(n) ? n : d; }
+function uid(){ return "e" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmt(n){ return Math.round(n).toLocaleString(); }
+function stamp(){ const d = new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0"); }
+function dayKey(ts){ const d = new Date(ts); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function fullTime(ts){ return new Date(ts).toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}); }
+function relTime(ts){
+  const diff = Date.now() - ts, m = 60000, h = 3600000, dd = 86400000;
+  if(diff < m) return "just now";
+  if(diff < h) return Math.floor(diff/m)+"m ago";
+  if(diff < dd) return Math.floor(diff/h)+"h ago";
+  if(diff < dd*7) return Math.floor(diff/dd)+"d ago";
+  return new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 500);
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+async function init(){
+  // 1. Load state: localStorage -> baked -> defaults
+  let loaded = null;
+  try{ const raw = localStorage.getItem(LS_KEY); if(raw) loaded = JSON.parse(raw); }catch(e){}
+  if(!loaded){
+    const bakedEl = document.getElementById("__BAKED_STATE__");
+    const baked = bakedEl ? bakedEl.textContent.trim() : "";
+    if(baked){ try{ loaded = JSON.parse(baked); }catch(e){} }
+  }
+  state = loaded ? hydrate(loaded) : defaultState();
+
+  // 2. If images were offloaded to IndexedDB on a prior save, pull them back in
+  if(state._portraitsInIDB && Object.keys(state.portraits).length === 0){
+    try{ const p = await idbGet("portraits"); if(p) state.portraits = p; }catch(e){}
+  }
+
+  // 3. Persist (creates the localStorage entry on first run / after baked load)
+  persistNow();
+
+  // 4. Apply settings, wire events, render, start FX
+  applyGlobalSettings();
+  bindEvents();
+  renderAll();
+  initFog();
+
+  // React to OS reduced-motion changes live
+  if(window.matchMedia){
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    (mq.addEventListener ? mq.addEventListener.bind(mq,"change") : mq.addListener.bind(mq))(()=>{ applyGlobalSettings(); startFog(); initPortraitSmoke(); });
+  }
+}
+
+// File input for portraits (single shared handler)
+document.getElementById("file-portrait").addEventListener("change", e => {
+  if(e.target.files[0]) handlePortraitFile(e.target.files[0]);
+  e.target.value = "";
+});
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
