@@ -1,0 +1,34 @@
+/* Console configuration. Ported from legacy/index.html. */
+
+.settings-grid{display:flex;flex-direction:column;gap:18px;}
+.setblock{padding:16px 18px;}
+.setblock h3{font-family:var(--font-display);font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin:0 0 14px;}
+
+.set-pillar{border:1px solid var(--edge);border-radius:10px;padding:12px;margin-bottom:12px;background:rgba(0,0,0,0.2);}
+.set-pillar .row1{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;}
+.set-actions-list{display:flex;flex-direction:column;gap:7px;}
+.set-action-row{display:flex;gap:8px;align-items:center;}
+.set-action-row input.a-name{flex:1;}
+.set-action-row input.a-xp{width:80px;}
+.reorder{display:flex;flex-direction:column;gap:2px;}
+.reorder button{padding:1px 6px;font-size:10px;line-height:1.2;}
+
+.rank-row{display:grid;grid-template-columns:44px 1fr 90px 1fr auto;gap:8px;align-items:center;margin-bottom:8px;}
+.rank-row .tno{font-family:var(--font-display);font-size:18px;color:var(--muted);text-align:center;}
+.rank-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--edge-strong);background:rgba(0,0,0,0.4);}
+.rank-thumb svg{width:26px;height:26px;}
+
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--edge);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-row .desc{font-size:11px;color:var(--muted);}
+.switch{position:relative;width:48px;height:26px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;inset:0;background:rgba(0,0,0,0.5);border:1px solid var(--edge-strong);border-radius:30px;transition:.2s;cursor:pointer;}
+.slider::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:.2s;}
+.switch input:checked + .slider{background:color-mix(in srgb, var(--accent) 30%, transparent);border-color:var(--accent);}
+.switch input:checked + .slider::before{transform:translateX(22px);background:var(--accent);box-shadow:0 0 10px var(--accent);}
+
+.accent-picker{display:flex;gap:10px;flex-wrap:wrap;}
+.accent-swatch{width:34px;height:34px;border-radius:8px;border:2px solid transparent;cursor:pointer;transition:transform .12s ease;}
+.accent-swatch:hover{transform:scale(1.1);}
+.accent-swatch.active{border-color:#fff;box-shadow:0 0 14px currentColor;}

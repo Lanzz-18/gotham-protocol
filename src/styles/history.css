@@ -1,0 +1,21 @@
+/* Activity log timeline. Ported from legacy/index.html. */
+
+.timeline{display:flex;flex-direction:column;gap:9px;}
+.log-item{
+  display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;
+  padding:11px 14px;border-radius:10px;
+  background:rgba(255,255,255,0.02);border:1px solid var(--edge);
+  transition:border-color .16s ease, background .16s ease;
+}
+.log-item:hover{border-color:var(--edge-strong);background:rgba(255,255,255,0.035);}
+.log-dot{width:11px;height:11px;border-radius:50%;background:var(--pc,var(--accent));box-shadow:0 0 10px var(--pc,var(--accent));}
+.log-main .action{font-size:13.5px;color:var(--text);}
+.log-main .meta{font-size:10.5px;color:var(--muted);letter-spacing:.5px;}
+.log-main .note{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:2px;}
+.log-xp{font-family:var(--font-display);font-size:17px;color:var(--pc,var(--accent));white-space:nowrap;}
+.log-tools{display:flex;gap:6px;}
+
+.icon-btn{background:transparent;border:1px solid var(--edge);border-radius:7px;padding:5px 7px;color:var(--muted);transition:all .14s ease;}
+.icon-btn:hover{color:var(--text);border-color:var(--edge-strong);}
+.icon-btn.danger:hover{color:var(--danger);border-color:var(--danger);}
+.icon-btn svg{width:14px;height:14px;display:block;}

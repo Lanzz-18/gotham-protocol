@@ -1,0 +1,74 @@
+/* Pillar cards. Ported from legacy/index.html. */
+
+.pillar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+
+.pillar-card{
+  padding:18px 18px 16px;position:relative;overflow:hidden;
+  /* echo of the profile effect: accent-tinted neon edge + breathing aura glow */
+  border-color:color-mix(in srgb, var(--pc,var(--accent)) 38%, var(--edge));
+  box-shadow:0 10px 34px rgba(0,0,0,0.5), 0 0 16px color-mix(in srgb, var(--pc,var(--accent)) 20%, transparent), inset 0 0 30px color-mix(in srgb, var(--pc,var(--accent)) 8%, transparent);
+  animation:card-aura 4.6s ease-in-out infinite;
+}
+.pillar-card .glowline{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg, transparent, var(--pc,var(--accent)), transparent);opacity:.7;box-shadow:0 0 10px var(--pc,var(--accent));}
+
+@keyframes card-aura{
+  0%,100%{box-shadow:0 10px 34px rgba(0,0,0,0.5), 0 0 13px color-mix(in srgb, var(--pc,var(--accent)) 16%, transparent), inset 0 0 26px color-mix(in srgb, var(--pc,var(--accent)) 6%, transparent);}
+  50%{box-shadow:0 10px 34px rgba(0,0,0,0.5), 0 0 28px color-mix(in srgb, var(--pc,var(--accent)) 36%, transparent), inset 0 0 36px color-mix(in srgb, var(--pc,var(--accent)) 14%, transparent);}
+}
+
+.pc-head{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
+.pc-icon{
+  width:44px;height:44px;flex-shrink:0;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 40% 30%, color-mix(in srgb, var(--pc,var(--accent)) 30%, transparent), rgba(0,0,0,0.4));
+  border:1px solid color-mix(in srgb, var(--pc,var(--accent)) 45%, transparent);
+  box-shadow:0 0 16px color-mix(in srgb, var(--pc,var(--accent)) 25%, transparent);
+}
+.pc-icon svg{width:24px;height:24px;color:var(--pc,var(--accent));filter:drop-shadow(0 0 5px color-mix(in srgb, var(--pc,var(--accent)) 60%, transparent));}
+.pc-title{flex:1;min-width:0;}
+.pc-title .name{font-family:var(--font-display);font-size:19px;letter-spacing:2px;text-transform:uppercase;color:#fff;line-height:1.05;}
+.pc-title .theme{font-size:10.5px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+.pc-level{text-align:right;flex-shrink:0;}
+.pc-level .lv-num{font-family:var(--font-display);font-size:30px;line-height:1;color:var(--pc,var(--accent));text-shadow:0 0 14px color-mix(in srgb, var(--pc,var(--accent)) 50%, transparent);}
+.pc-level .lv-lbl{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+.pc-barrow{margin:12px 0 6px;}
+.pc-xp{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:5px;letter-spacing:.5px;}
+.pc-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+
+.log-btn{
+  background:rgba(255,255,255,0.03);border:1px solid var(--edge);color:var(--text);
+  padding:7px 10px;border-radius:8px;font-size:11.5px;letter-spacing:.5px;
+  transition:all .14s ease;display:inline-flex;align-items:center;gap:6px;
+}
+.log-btn:hover{border-color:var(--pc,var(--accent));background:color-mix(in srgb, var(--pc,var(--accent)) 12%, transparent);box-shadow:0 0 12px color-mix(in srgb, var(--pc,var(--accent)) 25%, transparent);transform:translateY(-1px);}
+.log-btn .xp{color:var(--pc,var(--accent));font-family:var(--font-display);font-size:12px;}
+
+.pc-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:10.5px;color:var(--muted-2);}
+.pc-foot .last b{color:var(--muted);}
+
+/* ---------- Nemesis tug-of-war ----------
+   One thin bar: the ground you hold on the left in the pillar's own accent,
+   the villain's ground left dark and hatched. A bright divider marks the line
+   between you. No second hue, so this never collides with a pillar accent. */
+.nemesis-row{margin:10px 0 2px;}
+.tug{
+  position:relative;height:8px;border-radius:5px;overflow:hidden;
+  border:1px solid var(--edge);
+  background:repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 4px, rgba(0,0,0,0.4) 4px 8px);
+}
+.tug-you{
+  position:absolute;left:0;top:0;bottom:0;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--pc,var(--accent)) 50%, #000), var(--pc,var(--accent)));
+  transition:width .7s cubic-bezier(.2,.9,.25,1);
+}
+.tug-edge{
+  position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;
+  background:var(--danger);box-shadow:0 0 8px var(--danger);
+  transition:left .7s cubic-bezier(.2,.9,.25,1);
+}
+.nemesis-meta{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:5px;font-size:10px;letter-spacing:1px;text-transform:uppercase;}
+.nemesis-meta .vs{font-family:var(--font-display);color:var(--muted);white-space:nowrap;}
+.nemesis-meta .vs.ahead{color:var(--danger);}
+.nemesis-meta .nx{color:var(--muted-2);white-space:nowrap;}
+
+@keyframes cardflash{0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--flash, var(--pc,var(--accent))) 70%, transparent);}100%{box-shadow:0 0 40px 7px transparent;}}
+.pillar-card.levelup{animation:cardflash 1s ease-out;}
