@@ -1,0 +1,58 @@
+/* ============================================================
+   DESIGN TOKENS — the single source of colour for the whole app.
+   Every hex in here is asserted against APPROVED_PALETTE and the
+   WCAG contrast floors by tests/design/palette.test.ts.
+   ============================================================ */
+:root{
+  /* surfaces */
+  --bg:#050506;
+  --bg2:#08080a;
+  --bg3:#0d0d10;
+  --panel-solid:#0f0f12;
+  --panel:rgba(15,15,18,0.6);
+  --edge:rgba(255,255,255,0.07);
+  --edge-strong:rgba(255,255,255,0.14);
+
+  /* brand reds */
+  --red:#ff2537;
+  --red-bright:#ff5563;
+  --red-deep:#b3141f;
+  --red-dark:#6e0d15;
+  --crimson:#7a0d14;
+  --accent:#ff2537;
+
+  /* text — --muted-2 lifted from #585b66 (2.83:1, failed AA on 10.5px text) */
+  --text:#edeef2;
+  --steel:#c7ccd6;
+  --muted:#8a8e99;
+  --muted-2:#787c8a;
+  --danger:#ff5563;
+  --danger-soft:#ffb9c4;
+
+  /* rank auras, tiers 0-10 — monotonic contrast ramp, all clear 3:1 on --panel-solid */
+  --aura-0:#5e6169;
+  --aura-1:#bd383f;
+  --aura-2:#df1e2b;
+  --aura-3:#e53742;
+  --aura-4:#ff2537;
+  --aura-5:#ff4350;
+  --aura-6:#ff5f6b;
+  --aura-7:#ff7d87;
+  --aura-8:#ff9aa2;
+  --aura-9:#ffc2c7;
+  --aura-10:#ffffff;
+
+  /* live aura, swapped per rank by the UI */
+  --aura:#ff2537;
+  --aura-2-live:#ff5563;
+
+  /* legacy aliases kept so the ported CSS stays byte-faithful */
+  --gold:#ff2537;
+  --cyan:#c7ccd6;
+  --good:#c7ccd6;
+  --magenta:#7a0d14;
+
+  --font-display:"Bahnschrift","Oswald","Franklin Gothic Medium","Arial Narrow",system-ui,sans-serif;
+  --font-mono:"Cascadia Code","JetBrains Mono","Consolas",ui-monospace,monospace;
+  --radius:14px;
+}
