@@ -4,7 +4,7 @@ import { useStore } from "../store/useStore";
 import { useFog } from "../fx/useFog";
 import { downloadBlob, stamp } from "../lib/format";
 import { ping, stinger } from "../lib/audio";
-import { Header } from "./Header";
+import { Header, type View } from "./Header";
 import { ProfilePanel } from "./ProfilePanel";
 import { PillarGrid } from "./PillarGrid";
 import { HistoryView } from "./HistoryView";
@@ -16,20 +16,11 @@ import { RankUpOverlay } from "./RankUpOverlay";
 import type { LogEntry } from "../engine/types";
 import type { PersistedState } from "../store/db";
 
-type View = "dashboard" | "history" | "stats" | "settings";
-
 type Dialog =
   | { kind: "none" }
   | { kind: "custom" }
   | { kind: "edit"; entry: LogEntry }
   | { kind: "confirm"; title: string; msg: string; onYes: () => void };
-
-const TABS: Array<[View, string]> = [
-  ["dashboard", "Pillars"],
-  ["history", "History"],
-  ["stats", "Stats"],
-  ["settings", "Settings"],
-];
 
 export function App() {
   const store = useStore();
@@ -157,31 +148,16 @@ export function App() {
       <div className="scanlines" aria-hidden="true" />
 
       <div className="app">
-        <Header onExport={onExport} onImport={() => importRef.current?.click()} onReset={onReset} />
+        <Header view={view} onView={setView} onCustomLog={() => setDialog({ kind: "custom" })} />
 
         <div className="hud-body">
           <ProfilePanel onUploadPortrait={askPortrait} motion={motion} />
 
           <section>
-            <nav className="tabs" role="tablist">
-              {TABS.map(([id, label]) => (
-                <button
-                  key={id}
-                  role="tab"
-                  aria-selected={view === id}
-                  className={"tab" + (view === id ? " active" : "")}
-                  onClick={() => setView(id)}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
-
             {view === "dashboard" && (
               <div className="view" role="tabpanel">
                 <div className="toolbar-row">
                   <h2 className="section-title" style={{ flex: 1 }}>Five Pillars</h2>
-                  <button className="btn accent sm" onClick={() => setDialog({ kind: "custom" })}>+ Custom Log</button>
                 </div>
                 <PillarGrid />
               </div>
