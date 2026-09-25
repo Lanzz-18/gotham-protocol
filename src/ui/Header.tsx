@@ -14,14 +14,17 @@ interface HeaderProps {
   view: View;
   onView: (v: View) => void;
   onCustomLog: () => void;
+  onMenu: () => void;
 }
 
-export function Header({ view, onView, onCustomLog }: HeaderProps) {
+export function Header({ view, onView, onCustomLog, onMenu }: HeaderProps) {
   const appName = useStore((s) => s.config.appName);
 
   return (
     <header className="nav">
-      <span className="nav-mark" aria-hidden="true"><Icon name="bat" /></span>
+      <button className="nav-mark" onClick={onMenu} aria-label="Back to main menu">
+        <Icon name="bat" />
+      </button>
       <span className="nav-word">{appName}</span>
 
       <nav className="nav-links" role="tablist" aria-label="Views">
@@ -38,6 +41,7 @@ export function Header({ view, onView, onCustomLog }: HeaderProps) {
         ))}
       </nav>
 
+      <button className="nav-menu-btn" onClick={onMenu}>Main Menu</button>
       <button className="nav-cta" onClick={onCustomLog}>Log action</button>
     </header>
   );

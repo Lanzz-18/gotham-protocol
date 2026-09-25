@@ -9,6 +9,7 @@ import "./styles/history.css";
 import "./styles/stats.css";
 import "./styles/settings.css";
 import "./styles/overlays.css";
+import "./styles/menu.css";
 
 import { App } from "./ui/App";
 

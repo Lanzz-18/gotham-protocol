@@ -3,7 +3,7 @@
 
 #profile-panel{padding:20px 18px 22px;position:sticky;top:18px;text-align:center;overflow:visible;}
 
-.portrait-wrap{position:relative;width:230px;height:270px;margin:6px auto 4px;}
+.portrait-wrap{position:relative;width:230px;height:270px;margin:6px auto 30px;}
 .portrait-frame{
   position:absolute;inset:0;
   border:1px solid var(--edge-strong);

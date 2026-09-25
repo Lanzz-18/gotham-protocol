@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useStore } from "../store/useStore";
-import { useFog } from "../fx/useFog";
+import { useDotField } from "../fx/useDotField";
 import { downloadBlob, stamp } from "../lib/format";
 import { ping, stinger } from "../lib/audio";
 import { Header, type View } from "./Header";
+import { MainMenu } from "./MainMenu";
 import { ProfilePanel } from "./ProfilePanel";
 import { PillarGrid } from "./PillarGrid";
 import { HistoryView } from "./HistoryView";
@@ -32,6 +33,14 @@ export function App() {
 
   const [view, setView] = useState<View>("dashboard");
   const [dialog, setDialog] = useState<Dialog>({ kind: "none" });
+  /* menu -> leaving -> console. "leaving" keeps the menu mounted while it
+     dissolves, so the console can rise behind it instead of snapping in. */
+  const [menuPhase, setMenuPhase] = useState<"open" | "leaving" | "closed">("open");
+  const exitTimer = useRef<number | null>(null);
+  /* Mirrors leaveMenu: the console fades out first, then the menu mounts and
+     plays its own fade-in — so the trip back is just as smooth as the exit. */
+  const [returningToMenu, setReturningToMenu] = useState(false);
+  const returnTimer = useRef<number | null>(null);
 
   const importRef = useRef<HTMLInputElement | null>(null);
   const portraitRef = useRef<HTMLInputElement | null>(null);
@@ -42,7 +51,7 @@ export function App() {
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const motion = settings.motion && !prefersReduce;
 
-  const fogRef = useFog(motion);
+  const dotsRef = useDotField(motion);
 
   useEffect(() => { void hydrate(); }, [hydrate]);
 
@@ -53,6 +62,29 @@ export function App() {
   }, [settings.accent, motion, config.appName]);
 
   useEffect(() => { if (rankUpTier !== null) stinger(settings.sound); }, [rankUpTier, settings.sound]);
+
+  const leaveMenu = () => {
+    if (menuPhase !== "open") return;
+    if (!motion) { setMenuPhase("closed"); return; }
+    setMenuPhase("leaving");
+    exitTimer.current = window.setTimeout(() => setMenuPhase("closed"), 620);
+  };
+
+  const openMenu = () => {
+    if (exitTimer.current) clearTimeout(exitTimer.current);
+    if (menuPhase !== "closed" || returningToMenu) return;
+    if (!motion) { setMenuPhase("open"); return; }
+    setReturningToMenu(true);
+    returnTimer.current = window.setTimeout(() => {
+      setMenuPhase("open");
+      setReturningToMenu(false);
+    }, 520);
+  };
+
+  useEffect(() => () => {
+    if (exitTimer.current) clearTimeout(exitTimer.current);
+    if (returnTimer.current) clearTimeout(returnTimer.current);
+  }, []);
 
   const closeDialog = () => setDialog({ kind: "none" });
 
@@ -142,13 +174,26 @@ export function App() {
 
   return (
     <>
-      <canvas id="fog" ref={fogRef} aria-hidden="true" />
-      <div className="grid-overlay" aria-hidden="true" />
+      <canvas id="dots" ref={dotsRef} aria-hidden="true" />
       <div className="vignette" aria-hidden="true" />
-      <div className="scanlines" aria-hidden="true" />
 
-      <div className="app">
-        <Header view={view} onView={setView} onCustomLog={() => setDialog({ kind: "custom" })} />
+      {menuPhase !== "closed" && (
+        <MainMenu onEnter={leaveMenu} leaving={menuPhase === "leaving"} motion={motion} />
+      )}
+
+      <div
+        className={
+          "app"
+          + (menuPhase === "leaving" && motion ? " entering" : "")
+          + (returningToMenu ? " leaving" : "")
+        }
+      >
+        <Header
+          view={view}
+          onView={setView}
+          onCustomLog={() => setDialog({ kind: "custom" })}
+          onMenu={openMenu}
+        />
 
         <div className="hud-body">
           <ProfilePanel onUploadPortrait={askPortrait} motion={motion} />
