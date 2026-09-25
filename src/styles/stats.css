@@ -1,7 +1,136 @@
-/* Analytics charts. Ported from legacy/index.html. */
+/* Analytics: rank road, summary tiles, charts. */
 
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
-.chart-card{padding:16px 18px;}
-.chart-card h3{font-family:var(--font-display);font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin:0 0 14px;}
-.heat-legend{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);margin-top:10px;justify-content:flex-end;}
-.heat-legend .sw{width:12px;height:12px;border-radius:3px;border:1px solid var(--edge);}
+.range-pills{display:flex;gap:6px;}
+.range-pill{
+  background:rgba(255,255,255,0.045);border:0;border-radius:999px;
+  color:var(--muted);padding:7px 14px;font-size:12px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);
+  transition:background .14s ease, color .14s ease;
+}
+.range-pill:hover{color:var(--text);background:rgba(255,255,255,0.08);}
+.range-pill.on{color:var(--bg);background:var(--accent);box-shadow:none;font-weight:600;}
+.range-pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+/* ---------- batmobile rank road ---------- */
+.road-card{
+  border-radius:20px;padding:20px 22px 16px;margin-bottom:16px;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0) 45%),
+    var(--panel-solid);
+  box-shadow:0 18px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.road-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:26px;}
+.road-right{text-align:right;}
+.road-k{font-size:9.5px;letter-spacing:2.4px;text-transform:uppercase;color:var(--muted-2);margin-bottom:4px;}
+.road-rank{font-family:var(--font-display);font-size:22px;letter-spacing:1.4px;color:var(--text);line-height:1;}
+.road-next{font-size:13px;color:var(--muted);}
+.road-next span{color:var(--muted-2);font-size:11.5px;}
+
+.road{position:relative;height:52px;margin:0 0 10px;}
+.road-line{
+  position:absolute;left:0;right:0;bottom:9px;height:5px;border-radius:3px;
+  background:repeating-linear-gradient(90deg,
+    rgba(255,255,255,0.16) 0 16px, transparent 16px 30px);
+}
+/* The covered road glows like it is lit by the tail lamps — dim at the far
+   end, brightest right where the car is. */
+.road-fill{
+  position:absolute;left:0;bottom:9px;height:5px;border-radius:3px;
+  background:linear-gradient(90deg,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    color-mix(in srgb, var(--accent) 70%, transparent) 55%,
+    var(--accent) 100%);
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--accent) 65%, transparent),
+    0 0 26px color-mix(in srgb, var(--accent) 38%, transparent);
+  transition:width .9s cubic-bezier(.2,.9,.25,1);
+}
+/* the pool of light spilling off the back of the car */
+.road-glow{
+  position:absolute;bottom:-4px;width:120px;height:30px;
+  transform:translateX(-86%);
+  pointer-events:none;
+  background:radial-gradient(ellipse 50% 50% at 78% 50%,
+    color-mix(in srgb, var(--accent) 55%, transparent), transparent 70%);
+  filter:blur(6px);
+  transition:left .9s cubic-bezier(.2,.9,.25,1);
+  animation:lamp 1.6s ease-in-out infinite;
+}
+@keyframes lamp{0%,100%{opacity:.65;}50%{opacity:1;}}
+
+.road-car{
+  position:absolute;bottom:5px;transform:translateX(-50%);
+  width:104px;
+  transition:left .9s cubic-bezier(.2,.9,.25,1);
+}
+.car{width:100%;height:auto;display:block;overflow:visible;}
+.car-flare{animation:flare 1.1s ease-in-out infinite;transform-origin:left center;}
+@keyframes flare{0%,100%{opacity:.45;transform:scaleX(.7);}50%{opacity:1;transform:scaleX(1.3);}}
+.car-lamps{filter:drop-shadow(0 0 5px var(--accent)) drop-shadow(0 0 12px var(--accent));}
+.wheel{animation:roll 1.4s linear infinite;transform-origin:center;transform-box:fill-box;}
+@keyframes roll{to{transform:rotate(360deg);}}
+
+.road-foot{display:flex;justify-content:space-between;font-size:11px;color:var(--muted-2);}
+.road-pct{color:var(--muted);}
+
+/* ---------- summary tiles ---------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
+.tile{
+  border-radius:14px;padding:14px 16px;
+  background:rgba(255,255,255,0.03);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.tile-k{font-size:9.5px;letter-spacing:2.2px;text-transform:uppercase;color:var(--muted-2);}
+.tile-v{
+  font-family:var(--font-display);font-size:25px;line-height:1.15;color:var(--text);
+  font-variant-numeric:tabular-nums;margin-top:3px;
+}
+.tile-sub{font-size:10.5px;color:var(--muted-2);margin-top:2px;}
+
+/* ---------- chart cards ---------- */
+.stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+.chart-card{
+  border-radius:20px;padding:18px 20px 14px;min-width:0;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0) 45%),
+    var(--panel-solid);
+  box-shadow:0 18px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.chart-card.wide{grid-column:1/-1;}
+.chart-card h3{
+  font-family:var(--font-display);font-size:13px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);margin:0 0 14px;
+}
+.chart{width:100%;height:auto;display:block;overflow:visible;}
+
+/* ---------- pillar share ---------- */
+.share-bar{display:flex;height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,0.05);}
+.share-bar span{display:block;min-width:2px;}
+.share-legend{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.share-legend li{display:flex;align-items:center;gap:9px;font-size:12px;}
+.share-legend i{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
+.share-legend .nm{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.share-legend .vl{color:var(--text);font-variant-numeric:tabular-nums;}
+
+/* ---------- levels ---------- */
+.levels{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;}
+.levels li{display:grid;grid-template-columns:1fr 46% auto;gap:10px;align-items:center;font-size:12px;}
+.levels .nm{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.levels .track{height:6px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;}
+.levels .track i{display:block;height:100%;border-radius:999px;}
+.levels .vl{
+  font-family:var(--font-display);font-size:15px;color:var(--text);
+  font-variant-numeric:tabular-nums;min-width:22px;text-align:right;
+}
+
+/* ---------- heatmap ---------- */
+.heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(9px,1fr));gap:4px;}
+.heat span{aspect-ratio:1;border-radius:2.5px;display:block;}
+.heat-legend{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted-2);margin-top:12px;justify-content:flex-end;}
+.heat-legend .sw{width:11px;height:11px;border-radius:3px;}
+
+@media (max-width:760px){
+  .stats-grid{grid-template-columns:1fr;}
+  .chart-card.wide{grid-column:auto;}
+  .road-car{width:74px;}
+}
