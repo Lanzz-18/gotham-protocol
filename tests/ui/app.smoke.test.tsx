@@ -18,10 +18,52 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-async function mount() {
+/** Render and stop on the main menu. */
+async function mountMenu() {
   render(<App />);
   await waitFor(() => expect(useStore.getState().ready).toBe(true));
 }
+
+/** Render, then step through the main menu into the console. */
+async function mount() {
+  await mountMenu();
+  fireEvent.click(screen.getByRole("button", { name: /go to home/i }));
+  await waitFor(() => expect(document.querySelector(".menu")).toBeNull());
+}
+
+describe("The main menu", () => {
+  it("is what you land on, with the hero plate and its smoke", async () => {
+    await mountMenu();
+    expect(document.querySelector(".menu")).toBeTruthy();
+    expect(document.querySelector<HTMLImageElement>(".menu-plate")?.getAttribute("src")).toBe("menu-hero.webp");
+    expect(document.querySelector(".menu-smoke")).toBeTruthy();
+  });
+
+  it("hides the console until you go in", async () => {
+    await mountMenu();
+    expect(screen.getByRole("button", { name: /go to home/i })).toBeTruthy();
+    expect(document.querySelector(".menu")).toBeTruthy();
+  });
+
+  it("Go to home opens the console", async () => {
+    await mount();
+    expect(document.querySelector(".menu")).toBeNull();
+    expect(document.querySelector(".pillar-grid")).toBeTruthy();
+  });
+
+  it("the bat mark takes you back to the menu", async () => {
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: /back to main menu/i }));
+    // the console fades out before the menu remounts, so this crosses a real delay
+    await waitFor(() => expect(document.querySelector(".menu")).toBeTruthy(), { timeout: 2000 });
+  });
+
+  it("the Main Menu button does the same", async () => {
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: "Main Menu" }));
+    await waitFor(() => expect(document.querySelector(".menu")).toBeTruthy(), { timeout: 2000 });
+  });
+});
 
 describe("The console boots", () => {
   it("renders the title and all five pillars", async () => {
@@ -42,7 +84,7 @@ describe("The console boots", () => {
 
   it("survives having no canvas and no IndexedDB", async () => {
     await mount();
-    expect(document.querySelector("#fog")).toBeTruthy();
+    expect(document.querySelector("#dots")).toBeTruthy();
     expect(document.querySelector(".portrait-smoke")).toBeTruthy();
   });
 });
