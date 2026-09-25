@@ -7,3 +7,4 @@ export * from "./streak";
 export * from "./color";
 export * from "./shade";
 export * from "./nemesis";
+export * from "./series";
