@@ -1,0 +1,178 @@
+/* Main menu: the looping plate fills the screen, everything else sits over it. */
+
+.menu{
+  position:fixed;inset:0;z-index:120;
+  background:var(--bg);
+  overflow:hidden;
+  animation:menu-in .6s ease both;
+}
+
+/* Leaving: the plate pushes in and dissolves, the way a game menu hands off. */
+.menu.leaving{
+  animation:menu-out .62s cubic-bezier(.4,0,.2,1) both;
+  pointer-events:none;
+}
+.menu.leaving .menu-inner{animation:menu-content-out .34s ease both;}
+
+@keyframes menu-in{from{opacity:0;}to{opacity:1;}}
+@keyframes menu-out{
+  0%{opacity:1;transform:scale(1);filter:brightness(1);}
+  40%{opacity:.85;transform:scale(1.04);filter:brightness(1.25);}
+  100%{opacity:0;transform:scale(1.12);filter:brightness(0.4);}
+}
+@keyframes menu-content-out{
+  to{opacity:0;transform:translateY(-18px);}
+}
+
+/* The console rises into place behind it. */
+.app.entering{animation:console-in .72s cubic-bezier(.22,.9,.28,1) both;}
+@keyframes console-in{
+  from{opacity:0;transform:translateY(34px) scale(.985);}
+  to{opacity:1;transform:none;}
+}
+
+/* The trip back: console sinks and fades before the menu remounts and plays
+   its own fade-in, so "Main Menu" is a hand-off rather than a jump cut. */
+.app.leaving{animation:console-out .5s cubic-bezier(.4,0,.2,1) both;pointer-events:none;}
+@keyframes console-out{
+  from{opacity:1;transform:none;}
+  to{opacity:0;transform:translateY(20px) scale(.985);}
+}
+
+/* Frame and smoke share one stage. The aspect-ratio matters: it gives the box
+   a height before the image decodes, without which the canvas measures zero
+   and every wisp gets stretched into a vertical streak. */
+.menu-stage{
+  position:absolute;
+  left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  width:84vw;
+  aspect-ratio:1920/1080;
+  /* parallax: --px/--py are set from the pointer in MainMenu */
+  transform:translate(-50%,-50%) translate3d(var(--px,0px), var(--py,0px), 0);
+  transition:transform .55s cubic-bezier(.2,.9,.25,1);
+}
+
+/* He is standing, not posing for a photo — a long, shallow breath. The frame
+   and the smoke share the animation so they never drift apart. */
+@keyframes menu-breathe{
+  0%,100%{transform:scale(1) translateY(0);}
+  50%{transform:scale(1.011) translateY(-0.4%);}
+}
+.menu-frame,
+.menu-smoke{animation:menu-breathe 9.5s ease-in-out infinite;}
+
+/* A soft light crawls over the armour so the highlights shift. */
+.menu-gleam{
+  position:absolute;inset:-12%;
+  pointer-events:none;
+  background:radial-gradient(ellipse 26% 34% at 50% 44%, rgba(255,255,255,0.055), transparent 72%);
+  mix-blend-mode:screen;
+  animation:menu-gleam 17s ease-in-out infinite;
+}
+@keyframes menu-gleam{
+  0%,100%{transform:translate(-9%,3%);opacity:.45;}
+  50%{transform:translate(10%,-4%);opacity:1;}
+}
+/* No border, no glow — the plate has to dissolve into the page on all four
+   sides. Feathers are split across the wrapper and the image so each mask is
+   single-axis and mask-composite is never needed. */
+.menu-frame{
+  position:absolute;inset:0;
+  -webkit-mask-image:linear-gradient(to right, transparent 0, #000 13%, #000 87%, transparent 100%);
+  mask-image:linear-gradient(to right, transparent 0, #000 13%, #000 87%, transparent 100%);
+}
+.menu-plate{
+  display:block;width:100%;height:auto;
+  filter:brightness(1.12) contrast(1.04);
+  -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 4%, #000 90%, transparent 100%);
+  mask-image:linear-gradient(to bottom, transparent 0, #000 4%, #000 90%, transparent 100%);
+}
+/* Overhangs the frame so wisps can drift past the border instead of being
+   clipped at it. Must match PAD in useMenuSmoke.ts. */
+.menu-smoke{
+  position:absolute;
+  left:-8%;top:-8%;
+  width:116%;height:116%;
+  pointer-events:none;
+}
+
+/* Keeps the title and the button legible over whatever the plate is doing. */
+.menu-scrim{
+  position:absolute;inset:0;
+  background:
+    linear-gradient(180deg, rgba(5,5,6,0.80) 0%, rgba(5,5,6,0.10) 30%, rgba(5,5,6,0.10) 58%, rgba(5,5,6,0.88) 100%);
+}
+
+.menu-inner{
+  position:relative;height:100%;
+  display:flex;flex-direction:column;justify-content:space-between;align-items:center;
+  padding:48px 20px 54px;
+  text-align:center;
+}
+
+/* ---------- top ---------- */
+.menu-top{display:flex;flex-direction:column;align-items:center;gap:10px;}
+.menu-mark{
+  width:74px;height:40px;display:flex;align-items:center;justify-content:center;
+  color:var(--accent);
+}
+.menu-mark svg{
+  width:100%;height:auto;display:block;
+  animation:bat-blink 2.6s ease-in-out infinite;
+}
+/* A slow, smooth brighten-and-dim — always red, never off. The glow and the
+   fill both swell together so it reads as one light breathing, not a fade
+   layered over a flat icon. */
+@keyframes bat-blink{
+  0%,100%{
+    opacity:.72;
+    filter:drop-shadow(0 0 6px rgba(255,37,55,0.35)) drop-shadow(0 0 16px rgba(255,37,55,0.18));
+  }
+  50%{
+    opacity:1;
+    filter:drop-shadow(0 0 22px rgba(255,37,55,0.85)) drop-shadow(0 0 46px rgba(255,37,55,0.5));
+  }
+}
+.menu-title{
+  font-family:var(--font-display);font-weight:600;
+  font-size:clamp(26px,5.5vw,46px);letter-spacing:8px;text-transform:uppercase;
+  margin:0;color:#ffffff;line-height:1;
+}
+.menu-rank{
+  margin:0;font-size:11px;letter-spacing:4px;text-transform:uppercase;
+  color:var(--accent);
+}
+
+/* ---------- bottom ---------- */
+.menu-bottom{display:flex;flex-direction:column;align-items:center;gap:26px;width:100%;}
+
+.menu-stats{
+  display:flex;gap:34px;margin:0;padding:0;
+}
+.menu-stats div{display:flex;flex-direction:column;gap:3px;}
+.menu-stats dt{
+  font-size:9.5px;letter-spacing:2.4px;text-transform:uppercase;color:var(--muted);
+}
+.menu-stats dd{
+  margin:0;font-family:var(--font-display);font-size:22px;line-height:1;color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+
+.menu-enter{
+  border:0;border-radius:999px;
+  background:var(--accent);color:var(--bg);
+  padding:15px 42px;
+  font-family:var(--font-display);font-size:15px;font-weight:600;
+  letter-spacing:2.5px;text-transform:uppercase;
+  box-shadow:0 12px 34px rgba(255,37,55,0.32);
+  transition:transform .15s ease, filter .15s ease;
+}
+.menu-enter:hover{transform:translateY(-2px);filter:brightness(1.1);}
+.menu-enter:focus-visible{outline:2px solid #ffffff;outline-offset:3px;}
+
+@media (max-width:520px){
+  .menu-inner{padding:34px 16px 40px;}
+  .menu-stats{gap:24px;}
+  .menu-enter{padding:14px 32px;font-size:14px;}
+}
