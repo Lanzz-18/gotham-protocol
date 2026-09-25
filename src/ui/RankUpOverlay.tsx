@@ -18,8 +18,6 @@ export function RankUpOverlay({ rank, onDone }: RankUpOverlayProps) {
   return (
     <div id="rankup-overlay" style={{ ["--aura" as string]: rank.aura }} aria-hidden="true">
       <div className="ru-dim" />
-      <div className="ru-glitch" />
-      <div className="ru-beam" />
       <div className="ru-signal"><Icon name="bat" /></div>
       <div className="ru-text">
         <div className="k">Rank Ascended</div>

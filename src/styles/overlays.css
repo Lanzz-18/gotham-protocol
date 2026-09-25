@@ -26,13 +26,6 @@
 
 #rankup-overlay{position:fixed;inset:0;z-index:250;overflow:hidden;pointer-events:none;}
 .ru-dim{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%, rgba(0,0,0,0.2), rgba(0,0,0,0.9));animation:ru-dim 3.4s ease forwards;}
-.ru-beam{
-  position:absolute;top:50%;left:50%;width:260%;height:130px;
-  transform-origin:left center;
-  background:linear-gradient(90deg, color-mix(in srgb, var(--aura) 85%, white), transparent 70%);
-  filter:blur(6px);opacity:0;mix-blend-mode:screen;
-  animation:ru-sweep 3.2s ease-in-out;
-}
 .ru-signal{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.4);
   width:min(420px,70vw);opacity:0;filter:drop-shadow(0 0 40px var(--aura));
@@ -48,10 +41,7 @@
   font-family:var(--font-display);font-size:min(72px,13vw);font-weight:700;letter-spacing:6px;text-transform:uppercase;line-height:1;margin-top:6px;
   color:#fff;text-shadow:0 0 30px var(--aura), 0 0 60px color-mix(in srgb, var(--aura) 60%, transparent);
 }
-.ru-glitch{position:absolute;inset:0;background:var(--aura);mix-blend-mode:overlay;opacity:0;animation:ru-glitch 3.2s steps(1) forwards;}
 
 @keyframes ru-dim{0%{opacity:0;}12%{opacity:1;}80%{opacity:1;}100%{opacity:0;}}
-@keyframes ru-sweep{0%{opacity:0;transform:translate(-4%,-50%) rotate(-32deg);}18%{opacity:.9;}55%{opacity:.9;transform:translate(-4%,-50%) rotate(28deg);}100%{opacity:0;transform:translate(-4%,-50%) rotate(40deg);}}
 @keyframes ru-signal{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-6deg);}22%{opacity:1;transform:translate(-50%,-50%) scale(1.06) rotate(0);}70%{opacity:1;transform:translate(-50%,-50%) scale(1);}100%{opacity:0;transform:translate(-50%,-50%) scale(1.15);}}
 @keyframes ru-text{0%{opacity:0;transform:translateX(-50%) translateY(20px);}20%{opacity:1;transform:translateX(-50%) translateY(0);}80%{opacity:1;}100%{opacity:0;}}
-@keyframes ru-glitch{0%,100%{opacity:0;}6%{opacity:.5;}7%{opacity:0;}10%{opacity:.4;}11%{opacity:0;}}
