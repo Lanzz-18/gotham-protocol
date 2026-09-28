@@ -134,3 +134,11 @@
   .chart-card.wide{grid-column:auto;}
   .road-car{width:74px;}
 }
+@media (max-width:480px){
+  /* A long current rank ("Warden of Gotham") against a long next-rank line
+     ("Supreme Leader @ Lv 128") can outgrow a phone-width flex row even
+     though the text itself just wraps — stacking them reads cleaner than a
+     two-column squeeze. */
+  .road-head{flex-direction:column;gap:6px;margin-bottom:20px;}
+  .road-right{text-align:left;}
+}

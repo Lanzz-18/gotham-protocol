@@ -8,14 +8,18 @@
 .set-pillar .row1{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;}
 .set-actions-list{display:flex;flex-direction:column;gap:7px;}
 .set-action-row{display:flex;gap:8px;align-items:center;}
-.set-action-row input.a-name{flex:1;}
-.set-action-row input.a-xp{width:80px;}
+/* min-width:0 overrides the browser's default input min-content floor
+   (~170px+), which otherwise forces this row wider than its container and
+   pushes the page into a horizontal scroll on a phone. */
+.set-action-row input.a-name{flex:1;min-width:0;}
+.set-action-row input.a-xp{width:80px;flex-shrink:0;}
 .reorder{display:flex;flex-direction:column;gap:2px;}
 .reorder button{padding:1px 6px;font-size:10px;line-height:1.2;}
 
 .rank-row{display:grid;grid-template-columns:44px 1fr 90px 1fr auto;gap:8px;align-items:center;margin-bottom:8px;}
 .rank-row .tno{font-family:var(--font-display);font-size:18px;color:var(--muted);text-align:center;}
-.rank-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--edge-strong);background:rgba(0,0,0,0.4);}
+.rank-row input{min-width:0;}
+.rank-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--edge-strong);background:rgba(0,0,0,0.4);flex-shrink:0;}
 .rank-thumb svg{width:26px;height:26px;}
 
 .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--edge);}
@@ -32,3 +36,15 @@
 .accent-swatch{width:34px;height:34px;border-radius:8px;border:2px solid transparent;cursor:pointer;transition:transform .12s ease;}
 .accent-swatch:hover{transform:scale(1.1);}
 .accent-swatch.active{border-color:#fff;box-shadow:0 0 14px currentColor;}
+
+/* Below 560px the 5-column rank-row grid has nowhere to put its columns —
+   base.css used to force a 2-column override here, but with 5 children and
+   no grid-area assignment that just scattered the threshold field next to the
+   portrait thumbnail. Flex-wrap keeps the same DOM order (tier, title,
+   threshold, thumb, actions) and lets it wrap sensibly instead. */
+@media (max-width:560px){
+  .rank-row{display:flex;flex-wrap:wrap;gap:8px;}
+  .rank-row .tno{width:22px;flex-shrink:0;}
+  .rank-row input[type=text]{flex:1 1 120px;min-width:80px;}
+  .rank-row input[type=number]{flex:0 1 70px;}
+}

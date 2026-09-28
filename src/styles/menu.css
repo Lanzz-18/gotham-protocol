@@ -176,3 +176,11 @@
   .menu-stats{gap:24px;}
   .menu-enter{padding:14px 32px;font-size:14px;}
 }
+@media (max-width:400px){
+  /* At the 26px clamp floor, 8px letter-spacing pushes "GOTHAM PROTOCOL"
+     past a 375px screen and forces an ugly mid-word wrap. Tightening the
+     spacing here keeps it on one line without shrinking the type further. */
+  .menu-title{letter-spacing:4px;}
+  .menu-rank{letter-spacing:2.5px;}
+  .menu-stats{gap:16px;}
+}
