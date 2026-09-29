@@ -8,6 +8,19 @@ import { levelShade } from "../engine/shade";
 import type { EngineConfig, LogEntry, PillarId, PillarProgress } from "../engine/types";
 import { uid } from "../lib/format";
 import { clearState, loadState, saveState, type PersistedState } from "./db";
+import {
+  type CloudUser,
+  getCloudUser,
+  onAuthChange,
+  pullAndMergeHistory,
+  pullProfileIfNewer,
+  pushHistoryDelete,
+  pushHistoryEntry,
+  pushProfile,
+  signInWithPassword,
+  signOutCloud,
+  signUpWithPassword,
+} from "./cloudSync";
 
 export interface Toast {
   id: string;
@@ -37,7 +50,19 @@ interface Store {
   toasts: Toast[];
   rankUpTier: number | null;
 
+  /** null = signed out (or cloud sync isn't configured on this build). */
+  user: CloudUser | null;
+  authBusy: boolean;
+  authMessage: string | null;
+  /** When the local profile (config/settings/portraits) was last synced, so a
+   *  pull knows whether the cloud's copy is actually newer. */
+  profileSyncedAt: number;
+
   hydrate: () => Promise<void>;
+  /** Returns true on success, so the caller (the auth modal) knows to close. */
+  signUp: (name: string, email: string, password: string) => Promise<boolean>;
+  signIn: (email: string, password: string) => Promise<boolean>;
+  signOutUser: () => Promise<void>;
   addLog: (pillar: PillarId, action: string, xp: number, note?: string) => void;
   editLog: (id: string, patch: Partial<Omit<LogEntry, "id">>) => void;
   deleteLog: (id: string) => void;
@@ -93,7 +118,14 @@ export const useStore = create<Store>()(
     toasts: [],
     rankUpTier: null,
 
+    user: null,
+    authBusy: false,
+    authMessage: null,
+    profileSyncedAt: 0,
+
     hydrate: async () => {
+      // 1. Local first — the app is fully usable the instant this resolves,
+      //    online or not. Cloud sync layers on top, never gates this.
       const saved = await loadState();
       set((s) => {
         if (saved) {
@@ -105,15 +137,61 @@ export const useStore = create<Store>()(
         s.pillars = computePillars(s.history, s.config);
         s.ready = true;
       });
+
+      // 2. If already signed in (a returning session), reconcile with the
+      //    cloud right away. If not, wait for onAuthChange to fire — that
+      //    covers both a magic-link completing and a fresh sign-in.
+      const user = await getCloudUser();
+      if (user) {
+        set((s) => { s.user = user; });
+        await syncFromCloud(get, set);
+      }
+      onAuthChange((u) => {
+        const was = get().user;
+        set((s) => { s.user = u; });
+        if (u && !was) void syncFromCloud(get, set);
+      });
+    },
+
+    // Neither of these sets `user` directly — the onAuthChange listener
+    // registered in hydrate() is the single place that happens, so a
+    // password sign-in and a session restored on page load both flow
+    // through exactly one path into syncFromCloud, never two.
+    signUp: async (name, email, password) => {
+      set((s) => { s.authBusy = true; s.authMessage = null; });
+      const result = await signUpWithPassword(name, email, password);
+      set((s) => {
+        s.authBusy = false;
+        if (result.error) s.authMessage = result.error;
+        else if (result.needsConfirmation) s.authMessage = "Account created — check your email to confirm it, then sign in.";
+      });
+      return !result.error && !result.needsConfirmation && !!result.user;
+    },
+
+    signIn: async (email, password) => {
+      set((s) => { s.authBusy = true; s.authMessage = null; });
+      const result = await signInWithPassword(email, password);
+      set((s) => {
+        s.authBusy = false;
+        if (result.error) s.authMessage = result.error;
+      });
+      return !result.error && !!result.user;
+    },
+
+    signOutUser: async () => {
+      await signOutCloud();
+      set((s) => { s.user = null; s.authMessage = null; });
     },
 
     addLog: (pillar, action, xp, note = "") => {
       const before = snapshot(get().pillars, get().config);
+      const entry = { id: uid(), ts: systemClock.now(), pillar, action, xp: Number(xp) || 0, note };
       set((s) => {
-        s.history.push({ id: uid(), ts: systemClock.now(), pillar, action, xp: Number(xp) || 0, note });
+        s.history.push(entry);
         s.pillars = computePillars(s.history, s.config);
       });
       commit(get, set, before);
+      if (get().user) void pushHistoryEntry(entry);
     },
 
     editLog: (id, patch) => {
@@ -124,6 +202,8 @@ export const useStore = create<Store>()(
         s.pillars = computePillars(s.history, s.config);
       });
       persist(get());
+      const edited = get().history.find((h) => h.id === id);
+      if (get().user && edited) void pushHistoryEntry(edited);
     },
 
     deleteLog: (id) => {
@@ -132,6 +212,7 @@ export const useStore = create<Store>()(
         s.pillars = computePillars(s.history, s.config);
       });
       persist(get());
+      if (get().user) void pushHistoryDelete(id);
     },
 
     setConfig: (fn) => {
@@ -140,6 +221,7 @@ export const useStore = create<Store>()(
         s.pillars = computePillars(s.history, s.config);
       });
       persist(get());
+      schedulePushProfile(get, set);
     },
 
     setSettings: (patch) => {
@@ -147,6 +229,7 @@ export const useStore = create<Store>()(
         s.settings = { ...s.settings, ...patch };
       });
       persist(get());
+      schedulePushProfile(get, set);
     },
 
     setPortrait: (tier, dataUrl) => {
@@ -154,6 +237,7 @@ export const useStore = create<Store>()(
         s.portraits[tier] = dataUrl;
       });
       persist(get());
+      schedulePushProfile(get, set);
     },
 
     removePortrait: (tier) => {
@@ -161,6 +245,7 @@ export const useStore = create<Store>()(
         delete s.portraits[tier];
       });
       persist(get());
+      schedulePushProfile(get, set);
     },
 
     replaceAll: (incoming) => {
@@ -172,6 +257,12 @@ export const useStore = create<Store>()(
         s.pillars = computePillars(s.history, s.config);
       });
       persist(get());
+      // An imported backup is signed in for a reason — push it up too, so
+      // the other devices on this account see it on their next sync.
+      if (get().user) {
+        for (const entry of get().history) void pushHistoryEntry(entry);
+        schedulePushProfile(get, set);
+      }
     },
 
     resetAll: () => {
@@ -241,4 +332,51 @@ function persist(s: Store) {
     portraits: s.portraits,
     settings: s.settings,
   });
+}
+
+type Get = () => Store;
+type Set = (fn: (s: Store) => void) => void;
+
+/**
+ * Runs right after sign-in (and once on app load if already signed in):
+ * pull the cloud's history and profile, merge, then push back whatever the
+ * cloud had never seen — the two-way handshake that makes a brand-new device
+ * end up with everything and a device with pre-existing local data doesn't
+ * lose it.
+ */
+async function syncFromCloud(get: Get, set: Set) {
+  const { merged, toPush } = await pullAndMergeHistory(get().history);
+  set((s) => {
+    s.history = merged;
+    s.pillars = computePillars(s.history, s.config);
+  });
+  persist(get());
+  for (const entry of toPush) void pushHistoryEntry(entry);
+
+  const newer = await pullProfileIfNewer(get().profileSyncedAt);
+  if (newer) {
+    set((s) => {
+      s.config = migrateConfig(newer.blob.config);
+      s.settings = { ...DEFAULT_SETTINGS, ...newer.blob.settings };
+      s.portraits = newer.blob.portraits;
+      s.pillars = computePillars(s.history, s.config);
+      s.profileSyncedAt = newer.updatedAt;
+    });
+    persist(get());
+  }
+}
+
+let profilePushTimer: number | null = null;
+
+/** Debounced: a dragged slider fires setConfig on every `input` event, and
+ *  pushing a network request per pixel would be wasteful and noisy. */
+function schedulePushProfile(get: Get, set: Set) {
+  if (!get().user) return;
+  if (profilePushTimer) clearTimeout(profilePushTimer);
+  profilePushTimer = window.setTimeout(() => {
+    const s = get();
+    void pushProfile({ config: s.config, settings: s.settings, portraits: s.portraits }).then(() => {
+      set((d) => { d.profileSyncedAt = Date.now(); });
+    });
+  }, 900);
 }
