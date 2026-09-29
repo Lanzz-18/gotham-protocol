@@ -1,4 +1,5 @@
 import { useStore } from "../store/useStore";
+import { cloudConfigured } from "../store/supabaseClient";
 import { Icon } from "./Icons";
 import { PILLAR_ICON_CHOICES } from "./icon-data";
 import { xpToNext } from "../engine/xp";
@@ -22,6 +23,7 @@ export function SettingsView(props: SettingsViewProps) {
         <Pillars />
         <Ranks onUploadPortrait={props.onUploadPortrait} onRemovePortrait={props.onRemovePortrait} />
         <Curve />
+        <Account />
         <DataBlock onExport={props.onExport} onImport={props.onImport} onReset={props.onReset} />
       </div>
     </div>
@@ -224,6 +226,41 @@ function Curve() {
       <div style={{ marginTop: 6, fontSize: 11, color: "var(--muted-2)" }}>
         Changing the curve recomputes all levels from your history.
       </div>
+    </div>
+  );
+}
+
+/** The actual sign-up/sign-in form lives in the nav's Sign Up button (AuthModal)
+ *  — this block just shows where things stand and gives Sign Out a second home. */
+function Account() {
+  const user = useStore((s) => s.user);
+  const signOutUser = useStore((s) => s.signOutUser);
+
+  return (
+    <div className="panel setblock">
+      <h3>Account &amp; Sync</h3>
+
+      {!cloudConfigured ? (
+        <div style={{ fontSize: 11, color: "var(--muted)" }}>
+          Cloud sync isn't set up on this build — your data stays on this device only.
+          Export a backup to move it to another one.
+        </div>
+      ) : user ? (
+        <>
+          <div style={{ fontSize: 13, color: "var(--text)", marginBottom: 4 }}>
+            Signed in as <b>{user.name}</b> <span style={{ color: "var(--muted-2)" }}>({user.email})</span>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 14 }}>
+            Your logs follow you to any device signed in with this account.
+          </div>
+          <button className="btn ghost sm" onClick={() => void signOutUser()}>Sign out</button>
+        </>
+      ) : (
+        <div style={{ fontSize: 11, color: "var(--muted)" }}>
+          Not signed in. Use <b>Sign Up</b> in the header to create an account and sync your
+          pillars, history and settings to every device you own.
+        </div>
+      )}
     </div>
   );
 }

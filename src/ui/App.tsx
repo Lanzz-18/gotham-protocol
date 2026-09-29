@@ -6,6 +6,7 @@ import { downloadBlob, stamp } from "../lib/format";
 import { ping, stinger } from "../lib/audio";
 import { Header, type View } from "./Header";
 import { MainMenu } from "./MainMenu";
+import { AuthModal } from "./AuthModal";
 import { ProfilePanel } from "./ProfilePanel";
 import { PillarGrid } from "./PillarGrid";
 import { HistoryView } from "./HistoryView";
@@ -41,6 +42,7 @@ export function App() {
      plays its own fade-in — so the trip back is just as smooth as the exit. */
   const [returningToMenu, setReturningToMenu] = useState(false);
   const returnTimer = useRef<number | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
 
   const importRef = useRef<HTMLInputElement | null>(null);
   const portraitRef = useRef<HTMLInputElement | null>(null);
@@ -193,6 +195,7 @@ export function App() {
           onView={setView}
           onCustomLog={() => setDialog({ kind: "custom" })}
           onMenu={openMenu}
+          onOpenAuth={() => setAuthOpen(true)}
         />
 
         <div className="hud-body">
@@ -272,6 +275,8 @@ export function App() {
           <p style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.6 }}>{dialog.msg}</p>
         </Modal>
       )}
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
       {rank && <RankUpOverlay rank={rank} onDone={clearRankUp} />}
       <Toasts />
