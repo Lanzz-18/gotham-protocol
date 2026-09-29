@@ -39,6 +39,7 @@ export function MainMenu({ onEnter, leaving, motion }: MainMenuProps) {
   const config = useStore((s) => s.config);
   const pillars = useStore((s) => s.pillars);
   const history = useStore((s) => s.history);
+  const user = useStore((s) => s.user);
 
   const overall = overallLevel(pillars, config);
   const rank = currentRank(overall, config.ranks);
@@ -60,14 +61,16 @@ export function MainMenu({ onEnter, leaving, motion }: MainMenuProps) {
           <span className="menu-mark" aria-hidden="true"><Icon name="bat" /></span>
           <h1 className="menu-title">{config.appName}</h1>
           <p className="menu-rank">{rank.title}</p>
-        </div>
 
-        <div className="menu-bottom">
           <dl className="menu-stats">
             <div><dt>Overall</dt><dd>{overall}</dd></div>
             <div><dt>Streak</dt><dd>{streak}</dd></div>
             <div><dt>Logs</dt><dd>{history.length}</dd></div>
           </dl>
+        </div>
+
+        <div className="menu-bottom">
+          {user && <p className="menu-welcome">Welcome, {user.name}</p>}
 
           <button className="menu-enter" onClick={onEnter} autoFocus>
             Go to home
