@@ -25,42 +25,66 @@ body{
 /* ---------- layout ---------- */
 .app{position:relative;z-index:2;max-width:1440px;margin:0 auto;padding:18px 22px 60px;}
 
-/* ---------- nav: one floating pill, logo left, links centre, single CTA right ---------- */
+/* ---------- nav: no bar at all — logo + wordmark left, links centre, floating
+   over the dot field with nothing behind them ---------- */
 .nav{
   position:sticky;top:14px;z-index:50;
-  display:flex;align-items:center;gap:10px;
-  margin:0 0 26px;padding:7px 8px;
-  background:var(--panel-solid);
-  border:1px solid var(--edge-strong);
-  border-radius:999px;
-  box-shadow:0 14px 34px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+  display:flex;align-items:center;gap:16px;
+  margin:0 0 26px;padding:7px 4px;
+  background:transparent;border:0;box-shadow:none;
+}
+/* The nav itself has no fill, so a scrolled card would slide straight through
+   the tab text. This sits behind the nav's own children (z-index:-1, inside
+   the stacking context .nav's own z-index:50 already establishes) and fades
+   from solid to nothing — content dissolves as it passes under the row
+   instead of hard-clipping or showing through it. */
+.nav::before{
+  content:"";
+  position:absolute;
+  left:-24px;right:-24px;top:-40px;height:140px;
+  background:linear-gradient(to bottom, var(--bg) 0%, var(--bg) 46%, transparent 100%);
+  z-index:-1;pointer-events:none;
 }
 .nav-mark{
-  width:38px;height:38px;flex-shrink:0;border-radius:50%;border:0;padding:0;
-  background:#ffffff;color:var(--bg);
+  width:30px;height:30px;flex-shrink:0;border:0;padding:0;background:transparent;
+  color:var(--accent);
   display:flex;align-items:center;justify-content:center;
-  transition:transform .15s ease;
+  transition:filter .15s ease;
 }
-.nav-mark:hover{transform:scale(1.06);}
+.nav-mark:hover{filter:brightness(1.3) drop-shadow(0 0 6px var(--accent));}
 .nav-mark:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
-.nav-mark svg{width:22px;height:auto;display:block;}
+.nav-mark svg{width:100%;height:auto;display:block;}
 .nav-word{
   font-family:var(--font-display);font-weight:600;font-size:14px;letter-spacing:1.6px;
   text-transform:uppercase;color:var(--text);white-space:nowrap;
   margin:0 6px 0 4px;
 }
-.nav-links{display:flex;align-items:center;gap:2px;margin-left:auto;}
+.nav-links{display:flex;align-items:center;gap:6px;margin-left:auto;}
+
+/* Each tab is bare text; hovering (or being the active tab) draws a thin
+   white underline with a soft glow under both the line and the letters —
+   no background pill, nothing else changes shape. */
 .nav-link{
-  background:none;border:0;border-radius:999px;
-  padding:9px 15px;font-size:13px;color:var(--muted);
+  position:relative;
+  background:none;border:0;
+  padding:9px 12px;font-size:13px;color:var(--muted);
   letter-spacing:.2px;white-space:nowrap;
-  transition:color .15s ease, background .15s ease;
+  transition:color .18s ease;
 }
-.nav-link:hover{color:var(--text);background:rgba(255,255,255,0.05);}
-.nav-link[aria-selected="true"]{color:var(--text);background:rgba(255,255,255,0.09);}
+.nav-link::after{
+  content:"";position:absolute;left:12px;right:12px;bottom:3px;height:1.5px;
+  background:#ffffff;box-shadow:0 0 8px rgba(255,255,255,0.7);
+  transform:scaleX(0);transform-origin:center;
+  transition:transform .22s ease;
+}
+.nav-link:hover{color:#ffffff;text-shadow:0 0 10px rgba(255,255,255,0.45);}
+.nav-link:hover::after{transform:scaleX(1);}
+.nav-link[aria-selected="true"]{color:#ffffff;text-shadow:0 0 10px rgba(255,255,255,0.45);}
+.nav-link[aria-selected="true"]::after{transform:scaleX(1);}
 .nav-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
 .nav-menu-btn{
-  flex-shrink:0;margin-left:8px;
+  flex-shrink:0;
   background:transparent;color:var(--muted);
   border:1px solid var(--edge-strong);border-radius:999px;
   padding:9px 16px;font-size:13px;letter-spacing:.2px;
@@ -70,7 +94,7 @@ body{
 .nav-menu-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
 .nav-cta{
-  flex-shrink:0;margin-left:6px;
+  flex-shrink:0;
   background:var(--accent);color:var(--bg);
   border:0;border-radius:999px;
   padding:10px 18px;font-size:13px;font-weight:600;letter-spacing:.2px;
@@ -79,35 +103,57 @@ body{
 .nav-cta:hover{filter:brightness(1.1);}
 .nav-cta:focus-visible{outline:2px solid #ffffff;outline-offset:2px;}
 
+.nav-account{
+  flex-shrink:0;
+  display:inline-flex;align-items:center;gap:9px;
+  font-size:13px;font-weight:500;letter-spacing:.2px;color:var(--text);
+  white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;
+}
+.nav-account .dot{
+  width:6px;height:6px;border-radius:50%;flex-shrink:0;
+  background:var(--accent);box-shadow:0 0 6px var(--accent);
+}
+.nav-signout{
+  flex-shrink:0;
+  background:transparent;border:0;color:var(--muted);
+  font-size:12px;letter-spacing:.2px;padding:6px 10px;
+  transition:color .15s ease;
+}
+.nav-signout:hover{color:var(--danger);}
+.nav-signout:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
 @media (max-width:760px){
-  .nav{flex-wrap:wrap;border-radius:22px;padding:10px;gap:8px;}
+  .nav{flex-wrap:wrap;padding:10px 4px;}
   .nav-word{margin-right:auto;}
   .nav-links{order:3;width:100%;margin-left:0;overflow-x:auto;}
-  .nav-menu-btn{margin-left:0;}
-  .nav-cta{margin-left:0;}
 }
 
 .hud-body{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;}
 
 /* ---------- buttons ---------- */
 button{font-family:inherit;color:inherit;cursor:pointer;}
+/* Flat fills, no outline glow, no lift on hover — a colour shift is the only
+   feedback. Matches the soft-surface language the pillar and stats cards
+   already use, rather than the neon-bordered look everything started with. */
 .btn{
-  background:linear-gradient(180deg, rgba(30,34,50,0.9), rgba(18,20,32,0.9));
-  border:1px solid var(--edge-strong);
+  background:rgba(255,255,255,0.045);
+  border:0;
   color:var(--text);
   padding:9px 13px;border-radius:9px;font-size:12px;letter-spacing:1px;text-transform:uppercase;
-  transition:transform .12s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+  transition:background .16s ease, color .16s ease;
   display:inline-flex;align-items:center;gap:7px;
 }
-.btn:hover{transform:translateY(-1px);border-color:var(--accent);box-shadow:0 0 16px rgba(255,37,55,0.22);}
+.btn:hover{background:rgba(255,255,255,0.09);}
 .btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
-.btn.ghost{background:transparent;border-color:var(--edge);}
-.btn.accent{border-color:var(--accent);box-shadow:0 0 14px rgba(255,37,55,0.18);}
-.btn.danger{border-color:rgba(255,84,112,0.5);color:var(--danger-soft);}
-.btn.danger:hover{border-color:var(--danger);box-shadow:0 0 16px rgba(255,84,112,0.3);}
+.btn.ghost{background:transparent;border:1px solid var(--edge);}
+.btn.ghost:hover{background:rgba(255,255,255,0.04);border-color:var(--edge-strong);}
+.btn.accent{background:rgba(255,37,55,0.14);color:var(--accent);}
+.btn.accent:hover{background:rgba(255,37,55,0.22);}
+.btn.danger{background:rgba(255,84,112,0.07);color:var(--danger-soft);}
+.btn.danger:hover{background:rgba(255,84,112,0.14);color:var(--danger);}
 .btn.sm{padding:6px 9px;font-size:11px;}
 .btn .ic{width:15px;height:15px;flex-shrink:0;}
-.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
 
 .view{animation:fadein .35s ease;}
 
