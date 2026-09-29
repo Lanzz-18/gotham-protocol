@@ -233,11 +233,15 @@ select{cursor:pointer;}
 @keyframes toastin{from{opacity:0;transform:translateY(16px) scale(.96);}to{opacity:1;transform:none;}}
 @keyframes ring-pulse{0%,100%{opacity:.82;}50%{opacity:1;}}
 
-/* ---------- responsive ---------- */
+/* ---------- responsive ----------
+   #profile-panel's un-stick lives in profile.css, not here: it has to sit
+   AFTER the unconditional sticky rule in that file to win the cascade, since
+   an ID selector inside a media query has the exact same specificity as one
+   without — a tie that source order breaks, and base.css loads before
+   profile.css. Splitting it across files was what let the tie go the wrong
+   way in the first place. */
 @media (max-width:1080px){
   .hud-body{grid-template-columns:1fr;}
-  #profile-panel{position:relative;top:0;}
-  .portrait-wrap{width:210px;height:250px;}
 }
 @media (max-width:620px){
   .app{padding:12px 12px 40px;}

@@ -75,3 +75,13 @@
 .streak-badge .n{font-family:var(--font-display);font-size:20px;color:var(--gold);line-height:1;}
 .streak-badge .t{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
 .flavor{margin-top:12px;font-size:12px;font-style:italic;color:var(--muted);letter-spacing:.3px;}
+
+/* Below the width where hud-body stacks to one column, sticking the profile
+   panel means it re-pins itself over whatever tab content has scrolled up
+   underneath it — exactly the "overlapping widgets" bug. Placed last in this
+   file on purpose: it ties in specificity with the unconditional rule above,
+   and source order is what has to settle that tie. */
+@media (max-width:1080px){
+  #profile-panel{position:relative;top:0;}
+  .portrait-wrap{width:210px;height:250px;}
+}
