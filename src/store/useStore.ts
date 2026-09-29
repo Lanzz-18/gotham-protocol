@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
-import { DEFAULT_CONFIG } from "../engine/config";
+import { DEFAULT_CONFIG, DEFAULT_PORTRAITS } from "../engine/config";
 import { computePillars, currentRankIndex, overallLevel } from "../engine/ranks";
 import { systemClock } from "../engine/clock";
 import { levelShade } from "../engine/shade";
@@ -112,7 +112,7 @@ export const useStore = create<Store>()(
     ready: false,
     config: DEFAULT_CONFIG,
     history: [],
-    portraits: {},
+    portraits: DEFAULT_PORTRAITS,
     settings: DEFAULT_SETTINGS,
     pillars: computePillars([], DEFAULT_CONFIG),
     toasts: [],
@@ -131,7 +131,7 @@ export const useStore = create<Store>()(
         if (saved) {
           s.config = migrateConfig(saved.config);
           s.history = Array.isArray(saved.history) ? saved.history : [];
-          s.portraits = saved.portraits ?? {};
+          s.portraits = { ...DEFAULT_PORTRAITS, ...(saved.portraits ?? {}) };
           s.settings = { ...DEFAULT_SETTINGS, ...(saved.settings ?? {}) };
         }
         s.pillars = computePillars(s.history, s.config);
@@ -252,7 +252,7 @@ export const useStore = create<Store>()(
       set((s) => {
         s.config = migrateConfig(incoming.config);
         s.history = Array.isArray(incoming.history) ? incoming.history : [];
-        s.portraits = incoming.portraits ?? {};
+        s.portraits = { ...DEFAULT_PORTRAITS, ...(incoming.portraits ?? {}) };
         s.settings = { ...DEFAULT_SETTINGS, ...(incoming.settings ?? {}) };
         s.pillars = computePillars(s.history, s.config);
       });
@@ -269,7 +269,7 @@ export const useStore = create<Store>()(
       set((s) => {
         s.config = DEFAULT_CONFIG;
         s.history = [];
-        s.portraits = {};
+        s.portraits = DEFAULT_PORTRAITS;
         s.settings = DEFAULT_SETTINGS;
         s.pillars = computePillars([], DEFAULT_CONFIG);
       });

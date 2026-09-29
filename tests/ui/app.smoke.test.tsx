@@ -76,8 +76,11 @@ describe("The console boots", () => {
 
   it("starts a fresh profile at overall level 0, rank Drifter", async () => {
     await mount();
-    // Drifter renders twice: the portrait placeholder caption and the rank title.
-    expect(screen.getAllByText("Drifter")).toHaveLength(2);
+    // Only the rank title now — a fresh profile ships with a default portrait
+    // for tier 0, so the placeholder caption (which only renders when there
+    // is no image) never appears alongside it.
+    expect(screen.getAllByText("Drifter")).toHaveLength(1);
+    expect(document.querySelector(".portrait-frame img")).toBeTruthy();
     expect(screen.getByText("Overall Level")).toBeTruthy();
     expect(document.querySelector(".overall-row .lvl")?.textContent).toBe("0");
   });

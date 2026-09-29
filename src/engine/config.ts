@@ -67,3 +67,23 @@ export const SURFACES = {
   bg: "#050506",
   panel: "#0f0f12",
 } as const;
+
+/**
+ * The portrait shown for each rank tier out of the box, before any user has
+ * uploaded their own. Lives in public/ranks/ as a static asset, so it's the
+ * same for every install with zero setup — a personal upload for a tier
+ * still overrides it, this only fills the gap when nobody has.
+ */
+export const DEFAULT_PORTRAITS: Record<number, string> = {
+  0: "ranks/tier-0.webp",
+  1: "ranks/tier-1.webp",
+  2: "ranks/tier-2.webp",
+  3: "ranks/tier-3.webp",
+  4: "ranks/tier-4.webp",
+  5: "ranks/tier-5.webp",
+  6: "ranks/tier-6.webp",
+  7: "ranks/tier-7.webp",
+  8: "ranks/tier-8.webp",
+  9: "ranks/tier-9.webp",
+  10: "ranks/tier-10.webp",
+};
