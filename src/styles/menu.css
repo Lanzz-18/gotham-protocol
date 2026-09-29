@@ -178,6 +178,10 @@
   .menu-inner{padding:34px 16px 40px;}
   .menu-stats{gap:24px;}
   .menu-enter{padding:14px 32px;font-size:14px;}
+  /* 84vw on a phone leaves the plate small and adrift in a tall, mostly-empty
+     screen — there's no side content to protect on a narrow viewport, so let
+     it use nearly the full width instead. */
+  .menu-stage{width:96vw;}
 }
 @media (max-width:400px){
   /* At the 26px clamp floor, 8px letter-spacing pushes "GOTHAM PROTOCOL"
