@@ -75,6 +75,33 @@ describe("An id the cloud already has an opinion on", () => {
   });
 });
 
+describe("A change still waiting in the outbox", () => {
+  it("an offline delete stays deleted even though the cloud still has the row live", () => {
+    const { merged, toPush } = mergeHistory([], [remote("gone")], [{ kind: "delete", id: "gone" }]);
+    expect(merged.find((e) => e.id === "gone")).toBeUndefined();
+    expect(toPush).toEqual([]);
+  });
+
+  it("an offline edit beats the cloud's older copy", () => {
+    const edited = log("forge", 80, 1);
+    edited.id = "shared";
+    edited.action = "PR";
+    const { merged } = mergeHistory([edited], [remote("shared", { action: "Workout", xp: 50 })], [
+      { kind: "upsert", entry: edited },
+    ]);
+    const winner = merged.find((e) => e.id === "shared");
+    expect(winner?.action).toBe("PR");
+    expect(winner?.xp).toBe(80);
+  });
+
+  it("leaves pending entries out of toPush, so the outbox is the only thing sending them", () => {
+    const fresh = log("forge", 50, 1);
+    const { merged, toPush } = mergeHistory([fresh], [], [{ kind: "upsert", entry: fresh }]);
+    expect(merged.map((e) => e.id)).toEqual([fresh.id]);
+    expect(toPush).toEqual([]);
+  });
+});
+
 describe("Idempotence", () => {
   it("merging the same pull twice changes nothing further", () => {
     const rows = [remote("a"), remote("b", { deletedAt: "2026-01-01T00:00:00Z" })];

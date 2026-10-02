@@ -1,4 +1,4 @@
-import { mergeHistory, type RemoteHistoryRow } from "../engine/sync";
+import { mergeHistory, type PendingOp, type RemoteHistoryRow } from "../engine/sync";
 import type { EngineConfig, LogEntry } from "../engine/types";
 import { supabase } from "./supabaseClient";
 
@@ -85,9 +85,10 @@ export async function signOutCloud(): Promise<void> {
 /**
  * Pull this user's history from the cloud and reconcile it against what's
  * already local. Returns the merged set to load, plus whatever was
- * local-only and now needs pushing.
+ * local-only and now needs pushing. `pending` is the outbox: changes the
+ * cloud hasn't confirmed yet, which win over the cloud's older copy.
  */
-export async function pullAndMergeHistory(local: readonly LogEntry[]) {
+export async function pullAndMergeHistory(local: readonly LogEntry[], pending: readonly PendingOp[] = []) {
   if (!supabase) return { merged: [...local], toPush: [] as LogEntry[] };
   const { data, error } = await supabase.from("history").select("*");
   if (error || !data) return { merged: [...local], toPush: [] as LogEntry[] };
@@ -101,17 +102,18 @@ export async function pullAndMergeHistory(local: readonly LogEntry[]) {
     ts: Number(r.ts),
     deletedAt: r.deleted_at,
   }));
-  return mergeHistory(local, rows);
+  return mergeHistory(local, rows, pending);
 }
 
-/** Best-effort push of one log entry (a new one, or an edit). Never throws. */
-export async function pushHistoryEntry(entry: LogEntry): Promise<void> {
-  if (!supabase) return;
+/**
+ * Push one log entry (a new one, or an edit). Returns whether the cloud
+ * accepted it. Supabase reports most failures — offline included — as a
+ * returned `error`, not a throw, so both have to be checked.
+ */
+export async function pushHistoryEntry(entry: LogEntry, userId: string): Promise<boolean> {
+  if (!supabase) return false;
   try {
-    const { data } = await supabase.auth.getUser();
-    const userId = data.user?.id;
-    if (!userId) return;
-    await supabase.from("history").upsert({
+    const { error } = await supabase.from("history").upsert({
       id: entry.id,
       user_id: userId,
       pillar: entry.pillar,
@@ -122,22 +124,20 @@ export async function pushHistoryEntry(entry: LogEntry): Promise<void> {
       updated_at: new Date().toISOString(),
       deleted_at: null,
     });
+    return !error;
   } catch {
-    // Offline, or the request failed — the local write already succeeded,
-    // and the next pull-and-merge (on the next sign-in or app load) will
-    // pick this entry up via toPush since the cloud never saw it.
+    return false;
   }
 }
 
-/** Best-effort tombstone push — the row is never hard-deleted, just marked gone. */
-export async function pushHistoryDelete(id: string): Promise<void> {
-  if (!supabase) return;
+/** Tombstone push — the row is never hard-deleted, just marked gone. Returns whether it landed. */
+export async function pushHistoryDelete(id: string): Promise<boolean> {
+  if (!supabase) return false;
   try {
-    await supabase.from("history").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    const { error } = await supabase.from("history").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    return !error;
   } catch {
-    // Same story as pushHistoryEntry — this device's local state is already
-    // correct; a later sync from another device will just see a live row
-    // that this device meant to delete. Known limitation, see engine/sync.ts.
+    return false;
   }
 }
 

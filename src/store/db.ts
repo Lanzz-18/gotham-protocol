@@ -1,10 +1,18 @@
 import { openDB, type IDBPDatabase } from "idb";
 
+import type { PendingOp } from "../engine/sync";
 import type { EngineConfig, LogEntry } from "../engine/types";
 
 const DB_NAME = "gotham-protocol";
 const STORE = "kv";
 const STATE_KEY = "state";
+const OUTBOX_KEY = "outbox";
+
+/** A pending cloud change, tagged with the account it belongs to. */
+export interface OutboxItem {
+  userId: string;
+  op: PendingOp;
+}
 
 export interface PersistedState {
   version: number;
@@ -43,6 +51,25 @@ export async function saveState(state: PersistedState): Promise<void> {
   } catch {
     // Storage unavailable (private window, quota). The app stays usable in memory;
     // Export remains the reliable backup path.
+  }
+}
+
+export async function loadOutbox(): Promise<OutboxItem[]> {
+  try {
+    const d = await db();
+    const v = (await d.get(STORE, OUTBOX_KEY)) as OutboxItem[] | undefined;
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveOutbox(items: OutboxItem[]): Promise<void> {
+  try {
+    const d = await db();
+    await d.put(STORE, items, OUTBOX_KEY);
+  } catch {
+    // Same as saveState: storage unavailable, the queue lives in memory only.
   }
 }
 

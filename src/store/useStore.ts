@@ -14,13 +14,13 @@ import {
   onAuthChange,
   pullAndMergeHistory,
   pullProfileIfNewer,
-  pushHistoryDelete,
-  pushHistoryEntry,
   pushProfile,
   signInWithPassword,
   signOutCloud,
   signUpWithPassword,
 } from "./cloudSync";
+import { outbox } from "./outbox";
+import type { PendingOp } from "../engine/sync";
 
 export interface Toast {
   id: string;
@@ -127,6 +127,7 @@ export const useStore = create<Store>()(
       // 1. Local first — the app is fully usable the instant this resolves,
       //    online or not. Cloud sync layers on top, never gates this.
       const saved = await loadState();
+      await outbox.restore();
       set((s) => {
         if (saved) {
           s.config = migrateConfig(saved.config);
@@ -150,6 +151,11 @@ export const useStore = create<Store>()(
         const was = get().user;
         set((s) => { s.user = u; });
         if (u && !was) void syncFromCloud(get, set);
+      });
+      // Changes queued while offline go up the moment the connection is back.
+      window.addEventListener("online", () => {
+        const u = get().user;
+        if (u) void outbox.flush(u.id);
       });
     },
 
@@ -191,7 +197,7 @@ export const useStore = create<Store>()(
         s.pillars = computePillars(s.history, s.config);
       });
       commit(get, set, before);
-      if (get().user) void pushHistoryEntry(entry);
+      sendToCloud(get, [{ kind: "upsert", entry }]);
     },
 
     editLog: (id, patch) => {
@@ -203,7 +209,7 @@ export const useStore = create<Store>()(
       });
       persist(get());
       const edited = get().history.find((h) => h.id === id);
-      if (get().user && edited) void pushHistoryEntry(edited);
+      if (edited) sendToCloud(get, [{ kind: "upsert", entry: edited }]);
     },
 
     deleteLog: (id) => {
@@ -212,7 +218,7 @@ export const useStore = create<Store>()(
         s.pillars = computePillars(s.history, s.config);
       });
       persist(get());
-      if (get().user) void pushHistoryDelete(id);
+      sendToCloud(get, [{ kind: "delete", id }]);
     },
 
     setConfig: (fn) => {
@@ -260,7 +266,7 @@ export const useStore = create<Store>()(
       // An imported backup is signed in for a reason — push it up too, so
       // the other devices on this account see it on their next sync.
       if (get().user) {
-        for (const entry of get().history) void pushHistoryEntry(entry);
+        sendToCloud(get, get().history.map((entry) => ({ kind: "upsert", entry })));
         schedulePushProfile(get, set);
       }
     },
@@ -345,13 +351,18 @@ type Set = (fn: (s: Store) => void) => void;
  * lose it.
  */
 async function syncFromCloud(get: Get, set: Set) {
-  const { merged, toPush } = await pullAndMergeHistory(get().history);
+  const user = get().user;
+  if (!user) return;
+  // Send unsent changes first, and let whatever still couldn't go win the
+  // merge — otherwise the cloud's older copy would overwrite them.
+  await outbox.flush(user.id);
+  const { merged, toPush } = await pullAndMergeHistory(get().history, outbox.pending(user.id));
   set((s) => {
     s.history = merged;
     s.pillars = computePillars(s.history, s.config);
   });
   persist(get());
-  for (const entry of toPush) void pushHistoryEntry(entry);
+  sendToCloud(get, toPush.map((entry) => ({ kind: "upsert", entry })));
 
   const newer = await pullProfileIfNewer(get().profileSyncedAt);
   if (newer) {
@@ -364,6 +375,14 @@ async function syncFromCloud(get: Get, set: Set) {
     });
     persist(get());
   }
+}
+
+/** Queue history changes for the signed-in account and try to send them now. */
+function sendToCloud(get: Get, ops: PendingOp[]) {
+  const user = get().user;
+  if (!user || ops.length === 0) return;
+  for (const op of ops) outbox.enqueue(user.id, op);
+  void outbox.flush(user.id);
 }
 
 let profilePushTimer: number | null = null;

@@ -25,6 +25,20 @@ export interface MergeResult {
 }
 
 /**
+ * A change made on this device that the cloud has not confirmed yet. Edits
+ * and deletes need this: the cloud already knows those ids, so without a
+ * record of the pending change the next merge would let the cloud's stale
+ * copy win and quietly undo it.
+ */
+export type PendingOp =
+  | { kind: "upsert"; entry: LogEntry }
+  | { kind: "delete"; id: string };
+
+export function opId(op: PendingOp): string {
+  return op.kind === "upsert" ? op.entry.id : op.id;
+}
+
+/**
  * Reconcile a local history against the cloud's version of it.
  *
  * The rule is simple on purpose: for any id the cloud already knows about,
@@ -35,8 +49,16 @@ export interface MergeResult {
  * very same entry while both are offline at once — whichever syncs second
  * wins outright in that rare case, rather than attempting a merge of the
  * conflicting edit itself.
+ *
+ * The one exception is `pending`: a change this device made that has not
+ * reached the cloud yet beats the cloud's copy, because the cloud's copy is
+ * simply older. Those ids are left out of toPush — the outbox owns them.
  */
-export function mergeHistory(local: readonly LogEntry[], remote: readonly RemoteHistoryRow[]): MergeResult {
+export function mergeHistory(
+  local: readonly LogEntry[],
+  remote: readonly RemoteHistoryRow[],
+  pending: readonly PendingOp[] = [],
+): MergeResult {
   const alive = new Map<string, LogEntry>();
   const knownRemotely = new Set<string>();
 
@@ -46,11 +68,17 @@ export function mergeHistory(local: readonly LogEntry[], remote: readonly Remote
     alive.set(r.id, { id: r.id, pillar: r.pillar, action: r.action, xp: r.xp, note: r.note, ts: r.ts });
   }
 
+  const owned = new Set(pending.map(opId));
   const toPush: LogEntry[] = [];
   for (const e of local) {
     if (knownRemotely.has(e.id)) continue; // the cloud has already ruled on this id
     alive.set(e.id, e);
-    toPush.push(e);
+    if (!owned.has(e.id)) toPush.push(e);
+  }
+
+  for (const op of pending) {
+    if (op.kind === "delete") alive.delete(op.id);
+    else alive.set(op.entry.id, op.entry);
   }
 
   return { merged: [...alive.values()], toPush };
