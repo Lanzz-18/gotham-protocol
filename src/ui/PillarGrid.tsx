@@ -58,7 +58,8 @@ function LevelRing({ level, frac, accent }: { level: number; frac: number; accen
   );
 }
 
-export function PillarGrid({ motion }: { motion: boolean }) {
+/** `only` renders just that pillar's card — the Batsuit view's stats panel. */
+export function PillarGrid({ motion, only }: { motion: boolean; only?: PillarId }) {
   const config = useStore((s) => s.config);
   const live = useStore((s) => s.pillars);
   const history = useStore((s) => s.history);
@@ -136,7 +137,7 @@ export function PillarGrid({ motion }: { motion: boolean }) {
 
   return (
     <div className="pillar-grid" ref={gridRef}>
-      {config.pillars.map((p) => {
+      {config.pillars.filter((p) => !only || p.id === only).map((p) => {
         const st = pillars[p.id] ?? { xp: 0, level: 0, lastActivity: null };
         const need = xpToNext(st.level, config.xpCurve);
         const frac = Math.min(1, st.xp / need);

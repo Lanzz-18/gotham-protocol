@@ -1,0 +1,69 @@
+/* The Batsuit: the figure in a box beside the profile, its pillars on its body. */
+
+.suit{display:flex;flex-direction:column;gap:14px;}
+
+.suit-box{
+  position:relative;height:clamp(520px, 72vh, 720px);
+  border-radius:22px;overflow:hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 100%, rgba(255,37,55,0.08), transparent 70%),
+    radial-gradient(ellipse 70% 60% at 50% 30%, rgba(255,255,255,0.035), transparent 70%),
+    var(--panel-solid);
+  box-shadow:0 18px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.suit-box.hovering{cursor:pointer;}
+.suit-box.loading{
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--muted-2);
+}
+/* Anything the camera pushes past the box edge melts into the dark instead of being cut off. */
+.suit-canvas{
+  position:absolute !important;inset:0;
+  -webkit-mask-image:radial-gradient(ellipse 72% 78% at 50% 48%, #000 52%, transparent 100%);
+  mask-image:radial-gradient(ellipse 72% 78% at 50% 48%, #000 52%, transparent 100%);
+}
+
+.suit-caption{
+  position:absolute;left:50%;bottom:18px;transform:translateX(-50%);pointer-events:none;
+  font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);white-space:nowrap;
+}
+.suit-caption b{color:var(--text);font-weight:500;}
+
+/* The pillar in focus: its card, on the right, over the dark edge of the box. */
+.suit-panel{
+  position:absolute;top:18px;right:18px;bottom:18px;width:min(360px, 44%);
+  display:flex;flex-direction:column;gap:10px;overflow-y:auto;
+  animation:suit-panel-in .45s cubic-bezier(.2,.9,.25,1) .15s both;
+}
+@keyframes suit-panel-in{from{opacity:0;transform:translateX(24px);}to{opacity:1;transform:none;}}
+.suit-panel-head{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:10px;letter-spacing:2.4px;text-transform:uppercase;color:var(--muted-2);
+}
+.suit-close{
+  width:30px;height:30px;border-radius:50%;border:0;
+  background:rgba(255,255,255,0.06);color:var(--muted);font-size:18px;line-height:1;
+  transition:color .15s ease, background .15s ease;
+}
+.suit-close:hover{color:var(--text);background:rgba(255,255,255,0.1);}
+.suit-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.suit-panel .pillar-grid{grid-template-columns:1fr;}
+
+/* One button per pillar, in body order. */
+.suit-chips{display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:10px;}
+.suit-chip{
+  display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;
+  padding:11px 14px;border:0;border-radius:14px;
+  background:rgba(255,255,255,0.035);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+  transition:background .15s ease, box-shadow .15s ease;
+}
+.suit-chip b{font-family:var(--font-display);font-weight:normal;font-size:13px;letter-spacing:1.4px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.suit-chip span{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted-2);}
+.suit-chip:hover{background:rgba(255,255,255,0.07);}
+.suit-chip.on{background:rgba(255,37,55,0.12);box-shadow:inset 0 0 0 1px rgba(255,37,55,0.5);}
+.suit-chip.on span{color:var(--accent);}
+.suit-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+@media (max-width:1180px){
+  .suit-chips{grid-template-columns:repeat(3, minmax(0,1fr));}
+}
