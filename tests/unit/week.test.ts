@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { dayIndex } from "../../src/engine/streak";
+import { computeStreak, dayIndex, weekStartOf } from "../../src/engine/streak";
 import { fixedClock } from "../../src/engine/clock";
-import { debriefLine, lastFullWeekStart, weekStartOf, weekSummary } from "../../src/engine/week";
+import { computeNemesis } from "../../src/engine/nemesis";
+import {
+  canRest, debriefLine, lastFullWeekStart, nextRestWeek, restWeeksUsed, weekSummary,
+} from "../../src/engine/week";
 import { CONFIG, at, log } from "../helpers";
 
 // Friday 2 Oct 2026. The last full week is Mon 21 Sep – Sun 27 Sep.
@@ -94,8 +97,71 @@ describe("The debrief line", () => {
     expect(debriefLine(weekSummary(history, CONFIG, LAST, NOW))).toMatch(/^Up 250%/);
   });
 
+  it("a rest week gets its own line", () => {
+    const w = weekSummary([log("forge", 50, at(2026, 9, 14))], { ...CONFIG, restWeeks: [LAST] }, LAST, NOW);
+    expect(w.rest).toBe(true);
+    expect(debriefLine(w)).toMatch(/^Rest week/);
+  });
+
   it("never reads as a punishment — every line points at the next move", () => {
     const quiet = weekSummary([log("forge", 50, at(2026, 9, 1))], CONFIG, LAST, NOW);
     expect(debriefLine(quiet)).toMatch(/tomorrow/);
+  });
+});
+
+describe("I'm tired Alfred — a rest week", () => {
+  const THIS = weekStartOf(dayIndex(NOW.now(), B)); // Mon 28 Sep
+  const rested = { ...CONFIG, restWeeks: [LAST] }; // Mon 21 – Sun 27 Sep off
+
+  it("bridges the streak: rest days neither add to it nor break it", () => {
+    const history = [
+      ...Array.from({ length: 7 }, (_, i) => log("forge", 50, at(2026, 9, 14 + i))), // 14–20 Sep
+      ...Array.from({ length: 4 }, (_, i) => log("forge", 50, at(2026, 9, 28 + i))), // 28 Sep – 1 Oct
+    ];
+    expect(computeStreak(history, NOW, B)).toBe(4);
+    expect(computeStreak(history, NOW, B, rested.restWeeks)).toBe(11);
+  });
+
+  it("a day you did log in a rest week still counts toward the streak", () => {
+    const history = [log("forge", 50, at(2026, 9, 20)), log("forge", 50, at(2026, 9, 22))];
+    // Seen from Monday 28 Sep: 22 Sep logged, the rest of that week bridged, 20 Sep logged.
+    expect(computeStreak(history, fixedClock(at(2026, 9, 28, 15)), B, rested.restWeeks)).toBe(2);
+  });
+
+  it("the villains hold position for the whole week", () => {
+    const history = [log("forge", 50, at(2026, 9, 14))];
+    expect(computeNemesis(history, CONFIG, NOW).forge.missedDays).toBe(17);
+    expect(computeNemesis(history, rested, NOW).forge.missedDays).toBe(10);
+  });
+
+  it("the debrief charges no missed days for it", () => {
+    const w = weekSummary([log("forge", 50, at(2026, 9, 14))], rested, LAST, NOW);
+    expect(w.pillars.every((p) => p.missedDays === 0)).toBe(true);
+  });
+
+  it("the week after compares against the last real week, skipping the rest week", () => {
+    const history = [log("forge", 100, at(2026, 9, 15)), log("forge", 10, at(2026, 9, 22))];
+    expect(weekSummary(history, CONFIG, THIS, NOW).prevXp).toBe(10);
+    expect(weekSummary(history, rested, THIS, NOW).prevXp).toBe(100);
+  });
+});
+
+describe("The limit: 2 rest weeks in any 4", () => {
+  const W = 1000 * 7 + 4; // any Monday
+  it("allows a third only once one has rolled out of the 4-week window", () => {
+    expect(canRest([W - 7], W)).toBe(true);
+    expect(canRest([W - 7, W - 14], W)).toBe(false);
+    expect(canRest([W - 14, W - 21], W)).toBe(false);
+    expect(canRest([W - 21, W - 28], W)).toBe(true);
+    expect(restWeeksUsed([W - 21, W - 28], W)).toBe(1);
+  });
+
+  it("a week already taken can always stay taken", () => {
+    expect(canRest([W - 7, W - 14, W], W)).toBe(true);
+  });
+
+  it("says when the next rest week opens up", () => {
+    expect(nextRestWeek([W - 7, W - 14], W)).toBe(W + 14);
+    expect(nextRestWeek([], W)).toBe(W);
   });
 });

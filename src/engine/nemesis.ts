@@ -1,4 +1,4 @@
-import { dayIndex } from "./streak";
+import { dayIndex, isRestDay } from "./streak";
 import { levelFromTotal, pillarTotalXP } from "./xp";
 import type { Clock } from "./clock";
 import type { EngineConfig, LogEntry, PillarId } from "./types";
@@ -27,13 +27,15 @@ const FALLBACK_NAME = "THE VOID";
  *
  * The window opens on the day of your FIRST log for that pillar — you cannot
  * miss a habit you had not started — and closes YESTERDAY. The day you are
- * standing in is never counted, because it is not over yet.
+ * standing in is never counted, because it is not over yet. Days in a rest
+ * week are never counted either: the villain holds position.
  */
 export function missedDaysFor(
   history: readonly LogEntry[],
   pillar: PillarId,
   clock: Clock,
   boundaryHour = 0,
+  restWeeks: readonly number[] = [],
 ): number {
   let first = Infinity;
   const active = new Set<number>();
@@ -47,13 +49,11 @@ export function missedDaysFor(
   if (first === Infinity) return 0;
 
   const windowEnd = dayIndex(clock.now(), boundaryHour) - 1;
-  const span = Math.max(0, windowEnd - first + 1);
-  if (span === 0) return 0;
-
-  let logged = 0;
-  for (const idx of active) if (idx >= first && idx <= windowEnd) logged++;
-
-  return Math.max(0, span - logged);
+  let missed = 0;
+  for (let d = first; d <= windowEnd; d++) {
+    if (!active.has(d) && !isRestDay(d, restWeeks)) missed++;
+  }
+  return missed;
 }
 
 /** The villain standing opposite every pillar. */
@@ -66,7 +66,7 @@ export function computeNemesis(
   const out: Record<PillarId, NemesisState> = {};
 
   for (const p of config.pillars) {
-    const missedDays = missedDaysFor(history, p.id, clock, config.dayBoundaryHour);
+    const missedDays = missedDaysFor(history, p.id, clock, config.dayBoundaryHour, config.restWeeks);
     const xp = missedDays * rate;
     out[p.id] = {
       pillar: p.id,
@@ -96,7 +96,7 @@ export function tugOfWarFor(
   config: EngineConfig,
   clock: Clock,
 ): TugOfWar {
-  const villainXp = missedDaysFor(history, pillar, clock, config.dayBoundaryHour)
+  const villainXp = missedDaysFor(history, pillar, clock, config.dayBoundaryHour, config.restWeeks)
     * (config.nemesis?.xpPerMissedDay ?? 20);
   return tugOfWar(pillarTotalXP(history, pillar), villainXp);
 }

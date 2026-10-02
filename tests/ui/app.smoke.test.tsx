@@ -167,6 +167,30 @@ describe("The Nemesis bar", () => {
   });
 });
 
+describe("I'm tired Alfred", () => {
+  it("asks first, then marks the week as rest and offers to cancel", async () => {
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: "I'm tired Alfred" }));
+    expect(screen.getByText("Take the week, Master Wayne?")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rest this week" }));
+    await waitFor(() => expect(useStore.getState().config.restWeeks).toHaveLength(1));
+    expect(screen.getByRole("button", { name: "Cancel rest week" })).toBeTruthy();
+    expect(screen.getByText("Resting · back Monday")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel rest week" }));
+    await waitFor(() => expect(useStore.getState().config.restWeeks).toHaveLength(0));
+  });
+
+  it("Keep fighting closes the question without changing anything", async () => {
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: "I'm tired Alfred" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep fighting" }));
+    expect(screen.queryByText("Take the week, Master Wayne?")).toBeNull();
+    expect(useStore.getState().config.restWeeks ?? []).toHaveLength(0);
+  });
+});
+
 describe("Tabs switch views", () => {
   it("History shows the empty state, then the logged entry", async () => {
     await mount();

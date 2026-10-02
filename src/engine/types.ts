@@ -49,6 +49,9 @@ export interface EngineConfig {
   /** Hour at which a new day starts. 4 = a 1am log still counts for the night before. */
   dayBoundaryHour: number;
   nemesis: NemesisConfig;
+  /** Weeks taken off with "I'm tired Alfred", as Monday day indexes. Lives in
+   *  config so it rides the profile sync to every device. */
+  restWeeks?: number[];
 }
 
 export interface LevelResult {

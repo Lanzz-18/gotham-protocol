@@ -5,6 +5,7 @@ import { DEFAULT_CONFIG, DEFAULT_PORTRAITS } from "../engine/config";
 import { computePillars, currentRankIndex, overallLevel } from "../engine/ranks";
 import { systemClock } from "../engine/clock";
 import { levelShade } from "../engine/shade";
+import { canRest, currentWeekStart } from "../engine/week";
 import type { EngineConfig, LogEntry, PillarId, PillarProgress } from "../engine/types";
 import { uid } from "../lib/format";
 import { clearState, loadState, saveState, type PersistedState } from "./db";
@@ -68,6 +69,8 @@ interface Store {
   deleteLog: (id: string) => void;
 
   setConfig: (fn: (c: EngineConfig) => void) => void;
+  /** Mark or unmark the current week as a rest week. "blocked" = already 2 in the last 4 weeks. */
+  toggleRestWeek: () => "on" | "off" | "blocked";
   setSettings: (patch: Partial<Settings>) => void;
   setPortrait: (tier: number, dataUrl: string) => void;
   removePortrait: (tier: number) => void;
@@ -228,6 +231,19 @@ export const useStore = create<Store>()(
       });
       persist(get());
       schedulePushProfile(get, set);
+    },
+
+    toggleRestWeek: () => {
+      const { config } = get();
+      const week = currentWeekStart(systemClock, config.dayBoundaryHour);
+      const list = config.restWeeks ?? [];
+      if (list.includes(week)) {
+        get().setConfig((c) => { c.restWeeks = list.filter((w) => w !== week); });
+        return "off";
+      }
+      if (!canRest(list, week)) return "blocked";
+      get().setConfig((c) => { c.restWeeks = [...list, week]; });
+      return "on";
     },
 
     setSettings: (patch) => {

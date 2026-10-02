@@ -1,6 +1,7 @@
 import { useStore } from "../store/useStore";
 import { currentRank, currentRankIndex, nextRank, overallLevel, progressToNextOverall } from "../engine/ranks";
 import { computeStreak } from "../engine/streak";
+import { currentWeekStart } from "../engine/week";
 import { lifetimeXP } from "../engine/xp";
 import { systemClock } from "../engine/clock";
 import { usePortraitSmoke } from "../fx/usePortraitSmoke";
@@ -34,7 +35,8 @@ export function ProfilePanel({ onUploadPortrait, motion }: ProfilePanelProps) {
   const rank = currentRank(overall, config.ranks);
   const next = nextRank(overall, config.ranks);
   const prog = progressToNextOverall(pillars, config);
-  const streak = computeStreak(history, systemClock, config.dayBoundaryHour);
+  const streak = computeStreak(history, systemClock, config.dayBoundaryHour, config.restWeeks);
+  const resting = (config.restWeeks ?? []).includes(currentWeekStart(systemClock, config.dayBoundaryHour));
   const aura = rank.aura;
 
   const smokeRef = usePortraitSmoke(motion, idx);
@@ -67,6 +69,7 @@ export function ProfilePanel({ onUploadPortrait, motion }: ProfilePanelProps) {
 
       <div className="rank-tier-label">RANK TIER {idx}</div>
       <div className="rank-title">{rank.title}</div>
+      {resting && <div className="rest-tag">Resting · back Monday</div>}
 
       <div className="overall-block">
         <div className="overall-row">

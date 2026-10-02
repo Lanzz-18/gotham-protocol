@@ -55,6 +55,11 @@
   text-shadow:0 0 24px color-mix(in srgb, var(--aura) 45%, transparent);
 }
 .rank-tier-label{font-size:11px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;}
+.rest-tag{
+  display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;
+  font-size:10px;letter-spacing:1.8px;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--edge-strong);
+}
 
 .overall-block{margin-top:16px;text-align:left;}
 .overall-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}

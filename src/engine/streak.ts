@@ -25,15 +25,28 @@ export function dayIndex(ts: number, boundaryHour = 0): number {
   return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000);
 }
 
+/** Day index of the Monday starting the week that holds `idx`. Day 0 (1 Jan 1970) was a Thursday. */
+export function weekStartOf(idx: number): number {
+  return idx - ((((idx + 3) % 7) + 7) % 7);
+}
+
+/** True when the day falls in a week marked as a rest week. `restWeeks` holds Monday day indexes. */
+export function isRestDay(idx: number, restWeeks: readonly number[]): boolean {
+  return restWeeks.length > 0 && restWeeks.includes(weekStartOf(idx));
+}
+
 /**
  * Consecutive days ending today (or yesterday) that have at least one log.
  * Never penalises: a day still in progress cannot break the streak, so the
  * count only ever holds or grows until a full day is genuinely missed.
+ * Unlogged days in a rest week are skipped over — they neither add to the
+ * streak nor break it.
  */
 export function computeStreak(
   history: readonly LogEntry[],
   clock: Clock,
   boundaryHour = 0,
+  restWeeks: readonly number[] = [],
 ): number {
   if (history.length === 0) return 0;
 
@@ -45,11 +58,16 @@ export function computeStreak(
   if (!days.has(keyOf(cursor))) cursor.setDate(cursor.getDate() - 1);
 
   let streak = 0;
-  while (days.has(keyOf(cursor))) {
-    streak++;
+  for (;;) {
+    if (days.has(keyOf(cursor))) streak++;
+    else if (!isRestDay(indexOf(cursor), restWeeks)) break;
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
+}
+
+function indexOf(d: Date): number {
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000);
 }
 
 /** Distinct days that carry at least one log. Used by the heatmap and stats. */

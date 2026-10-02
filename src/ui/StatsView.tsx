@@ -179,10 +179,13 @@ function WeeklyDebrief() {
   const max = Math.max(1, ...w.pillars.map((p) => p.xp));
 
   return (
-    <div className="debrief-card">
+    <div className={"debrief-card" + (w.rest ? " rest" : "")}>
       <div className="debrief-head">
         <h3>Weekly debrief</h3>
-        <span className="debrief-range">{range}</span>
+        <span className="debrief-range">
+          {w.rest && <span className="debrief-rest">Rest week</span>}
+          {range}
+        </span>
       </div>
 
       <div className="debrief-nums">
@@ -227,7 +230,7 @@ function Summary({ days }: { days: number }) {
   const avg = averagePerDay(series);
   const windowXp = series.reduce((s, p) => s + p.xp, 0);
   const active = series.filter((p) => p.logs > 0).length;
-  const streak = computeStreak(history, systemClock, config.dayBoundaryHour);
+  const streak = computeStreak(history, systemClock, config.dayBoundaryHour, config.restWeeks);
 
   const tiles: Array<[string, string, string]> = [
     ["Lifetime XP", fmt(lifetimeXP(history)), `${fmt(windowXp)} in range`],

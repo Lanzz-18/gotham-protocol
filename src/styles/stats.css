@@ -109,6 +109,15 @@
 
 .debrief-line{margin:16px 0 0;font-size:12.5px;color:var(--text);}
 
+/* A rest week reads in grey — the bars and numbers dim, nothing is red. */
+.debrief-rest{
+  display:inline-block;margin-right:10px;padding:2px 8px;border-radius:999px;
+  font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--edge-strong);
+}
+.debrief-card.rest .debrief-pillars .track i{background:var(--muted-2);}
+.debrief-card.rest .debrief-nums em{color:var(--muted);}
+
 /* ---------- summary tiles ---------- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
 .tile{

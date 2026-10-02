@@ -43,7 +43,7 @@ export function MainMenu({ onEnter, leaving, motion }: MainMenuProps) {
 
   const overall = overallLevel(pillars, config);
   const rank = currentRank(overall, config.ranks);
-  const streak = computeStreak(history, systemClock, config.dayBoundaryHour);
+  const streak = computeStreak(history, systemClock, config.dayBoundaryHour, config.restWeeks);
 
   return (
     <div className={"menu" + (leaving ? " leaving" : "")} onPointerMove={onPointerMove}>

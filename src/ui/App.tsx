@@ -15,6 +15,7 @@ import { SettingsView } from "./SettingsView";
 import { Modal, type ModalAction } from "./Modal";
 import { Toasts } from "./Toasts";
 import { RankUpOverlay } from "./RankUpOverlay";
+import { RestWeek } from "./RestWeek";
 import type { LogEntry } from "../engine/types";
 import type { PersistedState } from "../store/db";
 
@@ -225,6 +226,7 @@ export function App() {
             )}
 
             {view === "stats" && <StatsView />}
+            {view === "dashboard" && <RestWeek />}
 
             {view === "settings" && (
               <SettingsView
