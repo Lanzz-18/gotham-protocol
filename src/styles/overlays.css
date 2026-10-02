@@ -28,7 +28,7 @@
 .toast .star svg{width:16px;height:16px;display:block;}
 
 #rankup-overlay{position:fixed;inset:0;z-index:250;overflow:hidden;pointer-events:none;}
-.ru-dim{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%, rgba(0,0,0,0.2), rgba(0,0,0,0.9));animation:ru-dim 3.4s ease forwards;}
+.ru-dim{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%, rgba(5,5,6,0.74), rgba(5,5,6,0.95));animation:ru-dim 3.6s ease forwards;}
 .ru-signal{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.4);
   width:min(420px,70vw);opacity:0;filter:drop-shadow(0 0 40px var(--aura));
@@ -44,6 +44,42 @@
   font-family:var(--font-display);font-size:min(72px,13vw);font-weight:700;letter-spacing:6px;text-transform:uppercase;line-height:1;margin-top:6px;
   color:#fff;text-shadow:0 0 30px var(--aura), 0 0 60px color-mix(in srgb, var(--aura) 60%, transparent);
 }
+
+/* ---------- suit-up: the portrait shatters and rebuilds as the new rank ---------- */
+.ru-card{
+  position:absolute;left:50%;top:40%;
+  width:min(260px, 58vw);aspect-ratio:230/270;
+  transform:translate(-50%,-50%);
+  animation:ru-card 3.6s ease forwards;
+}
+.ru-shards{position:absolute;inset:0;}
+.ru-tile{position:absolute;overflow:hidden;}
+.ru-tile img{position:absolute;object-fit:cover;max-width:none;}
+/* Old portrait: whole for a beat, then every tile blows outward, centre first. */
+.ru-shards.out .ru-tile{animation:ru-out .62s cubic-bezier(.55,0,.8,.4) calc(.55s + var(--dl)) both;}
+@keyframes ru-out{
+  from{transform:none;opacity:1;}
+  to{transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.6);opacity:0;}
+}
+/* New portrait: the pieces fly back in from wherever they were, outside first. */
+.ru-shards.in .ru-tile{animation:ru-in .7s cubic-bezier(.2,.9,.25,1) calc(1.35s - var(--dl)) both;}
+@keyframes ru-in{
+  from{transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.6);opacity:0;}
+  to{transform:none;opacity:1;}
+}
+/* The moment it locks together: one white flash and the aura blooms. */
+.ru-flash{position:absolute;inset:0;background:#ffffff;opacity:0;animation:ru-flash .55s ease-out 2.02s forwards;}
+@keyframes ru-flash{0%{opacity:0;}20%{opacity:.85;}100%{opacity:0;}}
+@keyframes ru-card{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.9);box-shadow:none;}
+  10%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  56%{box-shadow:0 0 0 1px color-mix(in srgb, var(--aura) 60%, transparent), 0 0 0 0 transparent;}
+  64%{box-shadow:0 0 0 1px var(--aura), 0 0 60px color-mix(in srgb, var(--aura) 70%, transparent);}
+  85%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.04);box-shadow:0 0 0 1px var(--aura), 0 0 60px color-mix(in srgb, var(--aura) 70%, transparent);}
+}
+/* With the suit-up playing, the title waits for the portrait to finish. */
+.ru-text.late{animation-delay:1.9s;animation-duration:1.7s;}
 
 @keyframes ru-dim{0%{opacity:0;}12%{opacity:1;}80%{opacity:1;}100%{opacity:0;}}
 @keyframes ru-signal{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-6deg);}22%{opacity:1;transform:translate(-50%,-50%) scale(1.06) rotate(0);}70%{opacity:1;transform:translate(-50%,-50%) scale(1);}100%{opacity:0;transform:translate(-50%,-50%) scale(1.15);}}

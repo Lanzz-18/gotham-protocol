@@ -81,6 +81,142 @@
 .streak-badge .t{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
 .flavor{margin-top:12px;font-size:12px;font-style:italic;color:var(--muted);letter-spacing:.3px;}
 
+/* ---------- streak flame: grows with the streak ---------- */
+.streak-badge{position:relative;}
+.streak-badge .flame{
+  position:relative;
+  width:calc(18px + var(--heat, 0) * 12px);height:calc(18px + var(--heat, 0) * 12px);
+  transition:width .6s ease, height .6s ease;
+}
+.streak-badge .flame svg{transform-origin:50% 90%;animation:flame-flicker 1.7s ease-in-out infinite;}
+@keyframes flame-flicker{
+  0%,100%{transform:scale(1) rotate(-3deg);}
+  35%{transform:scale(1.04,1.12) rotate(2deg);}
+  70%{transform:scale(.97,1.05) rotate(-1deg);}
+}
+/* No streak: an unlit flame. 7+: lit. 30+: a stronger glow and embers. 66+: white-hot. */
+.streak-badge.heat-0 .flame{opacity:.5;filter:none;}
+.streak-badge.heat-0 .flame svg{animation:none;}
+.streak-badge.heat-2 .flame{filter:drop-shadow(0 0 8px var(--gold)) drop-shadow(0 0 18px rgba(255,37,55,0.45));}
+.streak-badge.heat-3 .flame{filter:drop-shadow(0 0 5px #ffffff) drop-shadow(0 0 14px var(--gold)) drop-shadow(0 0 30px rgba(255,37,55,0.5));}
+.streak-badge.heat-3 .flame svg{color:#ffffff;}
+
+.flame-embers{position:absolute;inset:0;pointer-events:none;display:none;}
+.heat-2 .flame-embers,
+.heat-3 .flame-embers{display:block;}
+.flame-embers i{
+  position:absolute;bottom:40%;left:50%;width:2px;height:2px;border-radius:50%;
+  background:var(--gold);box-shadow:0 0 4px var(--gold);opacity:0;
+  animation:flame-ember 1.8s ease-out infinite;
+}
+.flame-embers i:nth-child(2){left:28%;animation-delay:.6s;}
+.flame-embers i:nth-child(3){left:70%;animation-delay:1.2s;}
+@keyframes flame-ember{
+  0%{opacity:0;transform:translate(0,0);}
+  20%{opacity:1;}
+  100%{opacity:0;transform:translate(3px,-22px);}
+}
+
+/* Milestone burst (7, 30, 66 days): the flame pops and a ring blows out. */
+.streak-badge.burst .flame{animation:flame-pop .7s cubic-bezier(.2,.9,.25,1);}
+@keyframes flame-pop{0%{transform:scale(1);}35%{transform:scale(1.7);}100%{transform:scale(1);}}
+.streak-badge.burst::after{
+  content:"";position:absolute;inset:-2px;border-radius:30px;pointer-events:none;
+  border:2px solid var(--gold);
+  animation:streak-ring 1.1s ease-out forwards;
+}
+@keyframes streak-ring{0%{opacity:.9;transform:scale(1);}100%{opacity:0;transform:scale(1.6,2.1);}}
+
+/* ---------- the legendary card ----------
+   lg-1 … lg-5 stack up as you rank: two tiers per step, The Legend alone at 5.
+   Each step only ADDS, so a higher card always has everything a lower one had. */
+
+/* 0 · Drifter, Initiate: plain. The glow is barely there and holds still. */
+#profile-panel:not(.lg-1) .portrait-aura{opacity:.2;animation:none;}
+#profile-panel:not(.lg-1) .portrait-ring{
+  animation:none;
+  box-shadow:0 0 4px var(--aura), 0 0 14px color-mix(in srgb, var(--aura) 40%, transparent);
+}
+/* 1 · Vigilante, Knight Errant: the pulsing aura and ring — the base rules above. */
+
+/* 2 · The Knight, Dark Knight: bat marks in the frame corners (thicker smoke is set in JS). */
+.portrait-corner{
+  position:absolute;z-index:6;width:24px;height:13px;display:none;
+  color:var(--aura);filter:drop-shadow(0 0 5px var(--aura));
+}
+.portrait-corner svg{width:100%;height:auto;display:block;}
+.portrait-corner.tl{left:-14px;top:-8px;transform:rotate(-45deg);}
+.portrait-corner.tr{right:-14px;top:-8px;transform:rotate(45deg);}
+.portrait-corner.bl{left:-14px;bottom:-8px;transform:rotate(-135deg);}
+.portrait-corner.br{right:-14px;bottom:-8px;transform:rotate(135deg);}
+#profile-panel.lg-2 .portrait-corner{display:block;}
+
+/* 3 · Sentinel, Warden of Gotham: a light runs round the frame; embers rise behind it. */
+@property --sweep{syntax:"<angle>";inherits:false;initial-value:0deg;}
+.portrait-sweep{
+  position:absolute;inset:-6px;border-radius:16px;z-index:4;pointer-events:none;display:none;
+  padding:3px;
+  background:conic-gradient(from var(--sweep), transparent 0deg 250deg, rgba(255,255,255,0.35) 310deg, #ffffff 345deg, transparent 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation:portrait-sweep 6s linear infinite;
+}
+@keyframes portrait-sweep{to{--sweep:360deg;}}
+#profile-panel.lg-3 .portrait-sweep{display:block;}
+
+.portrait-embers{position:absolute;inset:0;z-index:2;pointer-events:none;display:none;}
+#profile-panel.lg-3 .portrait-embers{display:block;}
+/* Out in the gutters either side of the frame, rising past its top. */
+.portrait-embers i{
+  position:absolute;bottom:4%;width:4px;height:4px;border-radius:50%;opacity:0;
+  background:var(--aura);box-shadow:0 0 8px var(--aura), 0 0 2px #ffffff;
+  animation:portrait-ember 4.2s ease-out infinite;
+}
+.portrait-embers i:nth-child(1){left:-9%;animation-delay:0s;}
+.portrait-embers i:nth-child(2){left:-14%;animation-delay:1.3s;}
+.portrait-embers i:nth-child(3){left:-6%;animation-delay:2.6s;}
+.portrait-embers i:nth-child(4){left:-12%;animation-delay:3.4s;}
+.portrait-embers i:nth-child(5){left:-4%;animation-delay:.7s;}
+.portrait-embers i:nth-child(6){right:-9%;animation-delay:.4s;}
+.portrait-embers i:nth-child(7){right:-14%;animation-delay:1.8s;}
+.portrait-embers i:nth-child(8){right:-6%;animation-delay:2.9s;}
+.portrait-embers i:nth-child(9){right:-12%;animation-delay:3.7s;}
+.portrait-embers i:nth-child(10){right:-4%;animation-delay:1.1s;}
+@keyframes portrait-ember{
+  0%{opacity:0;transform:translate(0,0) scale(1);}
+  12%{opacity:1;}
+  100%{opacity:0;transform:translate(8px,-300px) scale(.4);}
+}
+
+/* 4 · Overlord, Supreme Leader: the frame edge breathes red to white; the title gets a metal shine. */
+#profile-panel.lg-4 .portrait-ring{animation:ring-pulse 3.4s ease-in-out infinite, ring-shift 5s ease-in-out infinite;}
+@keyframes ring-shift{
+  0%,100%{border-color:color-mix(in srgb, var(--aura) 85%, white 12%);}
+  50%{border-color:#ffffff;}
+}
+#profile-panel.lg-4 .rank-title{
+  background:linear-gradient(100deg, #ffffff 0%, var(--aura) 25%, #ffffff 40%, #ffffff 46%, var(--aura) 62%, #ffffff 100%);
+  background-size:260% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:title-shine 4.5s linear infinite;
+}
+@keyframes title-shine{from{background-position:100% 0;}to{background-position:-160% 0;}}
+
+/* 5 · The Legend: white glow, the bat signal thrown up behind the portrait, white sparks. */
+/* The portrait covers the middle of the signal, so the light has to be
+   strongest at its rim: a bright band around the frame with the bat's wings
+   cutting black through it either side. */
+.portrait-halo{
+  position:absolute;inset:-34px -48px;z-index:0;pointer-events:none;display:none;
+  align-items:center;justify-content:center;
+  background:radial-gradient(closest-side, rgba(237,238,242,0.30) 0 74%, rgba(237,238,242,0.10) 88%, transparent 100%);
+}
+.portrait-halo svg{width:100%;height:auto;color:var(--bg);}
+#profile-panel.lg-5 .portrait-halo{display:flex;animation:halo-breathe 6s ease-in-out infinite;}
+@keyframes halo-breathe{0%,100%{opacity:.75;transform:scale(1);}50%{opacity:1;transform:scale(1.04);}}
+#profile-panel.lg-5 .portrait-embers i{background:#ffffff;box-shadow:0 0 8px #ffffff;animation-duration:6s;}
+
 /* Below the width where hud-body stacks to one column, sticking the profile
    panel means it re-pins itself over whatever tab content has scrolled up
    underneath it — exactly the "overlapping widgets" bug. Placed last in this
