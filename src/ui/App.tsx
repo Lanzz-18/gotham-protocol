@@ -8,7 +8,7 @@ import { Header, type View } from "./Header";
 import { MainMenu } from "./MainMenu";
 import { AuthModal } from "./AuthModal";
 import { ProfilePanel } from "./ProfilePanel";
-import { PillarGrid } from "./PillarGrid";
+import { PillarsView } from "./PillarsView";
 import { HistoryView } from "./HistoryView";
 import { StatsView } from "./StatsView";
 import { SettingsView } from "./SettingsView";
@@ -227,7 +227,7 @@ export function App() {
                 <div className="toolbar-row">
                   <h2 className="section-title" style={{ flex: 1 }}>Five Pillars</h2>
                 </div>
-                <PillarGrid motion={motion} />
+                <PillarsView motion={motion} />
               </div>
             )}
 

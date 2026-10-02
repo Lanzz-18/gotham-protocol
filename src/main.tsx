@@ -5,6 +5,7 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/profile.css";
 import "./styles/pillars.css";
+import "./styles/suit.css";
 import "./styles/history.css";
 import "./styles/stats.css";
 import "./styles/rogues.css";
