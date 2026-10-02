@@ -5,6 +5,7 @@ import { pillarTotalXP, lifetimeXP } from "../engine/xp";
 import { computeStreak } from "../engine/streak";
 import { currentRank, currentRankIndex, nextRank, overallLevel } from "../engine/ranks";
 import { averagePerDay, bestDay, dailySeries, rankProgress, type DayPoint } from "../engine/series";
+import { debriefLine, lastFullWeekStart, weekSummary } from "../engine/week";
 import { systemClock } from "../engine/clock";
 import { fmt } from "../lib/format";
 
@@ -35,6 +36,7 @@ export function StatsView() {
       </div>
 
       <RankRoad />
+      <WeeklyDebrief />
       <Summary days={days} />
 
       <div className="stats-grid">
@@ -146,6 +148,71 @@ function Batmobile() {
       <circle className="wheel" cx="31" cy="32" r="8.5" fill="#050506" stroke="rgba(255,255,255,0.4)" strokeWidth="2.2" />
       <circle className="wheel" cx="95" cy="32" r="8.5" fill="#050506" stroke="rgba(255,255,255,0.4)" strokeWidth="2.2" />
     </svg>
+  );
+}
+
+/* ================= weekly debrief ================= */
+
+const shortDate = (ts: number) => new Date(ts).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+/** Last full Monday-to-Sunday week: the numbers, each pillar, and one line on what to do next. */
+function WeeklyDebrief() {
+  const config = useStore((s) => s.config);
+  const history = useStore((s) => s.history);
+
+  const w = weekSummary(history, config, lastFullWeekStart(systemClock, config.dayBoundaryHour), systemClock);
+  const range = `${shortDate(w.startTs)} – ${shortDate(w.endTs)}`;
+
+  if (!w.started) {
+    return (
+      <div className="debrief-card">
+        <div className="debrief-head">
+          <h3>Weekly debrief</h3>
+          <span className="debrief-range">{range}</span>
+        </div>
+        <p className="debrief-line">Your first debrief lands after your first full week.</p>
+      </div>
+    );
+  }
+
+  const change = w.prevXp > 0 ? Math.round(((w.xp - w.prevXp) / w.prevXp) * 100) : null;
+  const max = Math.max(1, ...w.pillars.map((p) => p.xp));
+
+  return (
+    <div className="debrief-card">
+      <div className="debrief-head">
+        <h3>Weekly debrief</h3>
+        <span className="debrief-range">{range}</span>
+      </div>
+
+      <div className="debrief-nums">
+        <div>
+          <b>{fmt(w.xp)}</b>
+          <span>XP{change !== null && <em className={change < 0 ? "down" : ""}> {change >= 0 ? "+" : ""}{change}%</em>}</span>
+        </div>
+        <div><b>{w.activeDays}/7</b><span>active days</span></div>
+        <div><b>{w.logs}</b><span>logs</span></div>
+        <div>
+          <b>{w.best ? fmt(w.best.xp) : "0"}</b>
+          <span>{w.best ? `best · ${new Date(w.best.ts).toLocaleDateString(undefined, { weekday: "short" })}` : "best day"}</span>
+        </div>
+      </div>
+
+      <ul className="debrief-pillars">
+        {w.pillars.map((p) => (
+          <li key={p.id}>
+            <span className="nm">{p.name}</span>
+            <span className="track"><i style={{ width: `${(p.xp / max) * 100}%` }} /></span>
+            <span className="vl">{fmt(p.xp)}</span>
+            <span className={"foe" + (p.missedDays > 0 ? " on" : "")}>
+              {p.missedDays > 0 ? `${p.nemesis} +${p.missedDays}d` : p.logs > 0 ? "held" : "—"}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <p className="debrief-line">{debriefLine(w)}</p>
+    </div>
   );
 }
 

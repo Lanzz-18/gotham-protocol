@@ -73,6 +73,42 @@
 .road-foot{display:flex;justify-content:space-between;font-size:11px;color:var(--muted-2);}
 .road-pct{color:var(--muted);}
 
+/* ---------- weekly debrief ---------- */
+.debrief-card{
+  border-radius:20px;padding:18px 22px 16px;margin-bottom:16px;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0) 45%),
+    var(--panel-solid);
+  box-shadow:0 18px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.debrief-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:16px;}
+.debrief-head h3{
+  font-family:var(--font-display);font-size:13px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);margin:0;
+}
+.debrief-range{font-size:11.5px;color:var(--muted-2);font-variant-numeric:tabular-nums;}
+
+.debrief-nums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px;}
+.debrief-nums div{display:flex;flex-direction:column;gap:3px;}
+.debrief-nums b{
+  font-family:var(--font-display);font-size:22px;line-height:1;color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+.debrief-nums span{font-size:10.5px;color:var(--muted-2);}
+.debrief-nums em{font-style:normal;color:var(--accent);}
+.debrief-nums em.down{color:var(--muted);}
+
+.debrief-pillars{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;}
+.debrief-pillars li{display:grid;grid-template-columns:1fr 34% 44px 118px;gap:10px;align-items:center;font-size:12px;}
+.debrief-pillars .nm{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.debrief-pillars .track{height:5px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;}
+.debrief-pillars .track i{display:block;height:100%;border-radius:999px;background:var(--accent);}
+.debrief-pillars .vl{color:var(--text);text-align:right;font-variant-numeric:tabular-nums;}
+.debrief-pillars .foe{font-size:10.5px;color:var(--muted-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.debrief-pillars .foe.on{color:var(--accent);}
+
+.debrief-line{margin:16px 0 0;font-size:12.5px;color:var(--text);}
+
 /* ---------- summary tiles ---------- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
 .tile{
@@ -141,4 +177,9 @@
      two-column squeeze. */
   .road-head{flex-direction:column;gap:6px;margin-bottom:20px;}
   .road-right{text-align:left;}
+  /* Four numbers across a phone get cramped; two by two reads cleaner. The
+     villain column drops under the bar's row instead of squeezing it. */
+  .debrief-nums{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:14px;}
+  .debrief-pillars li{grid-template-columns:1fr 30% 40px;}
+  .debrief-pillars .foe{grid-column:1/-1;text-align:left;margin-top:-5px;}
 }

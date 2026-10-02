@@ -9,3 +9,4 @@ export * from "./shade";
 export * from "./nemesis";
 export * from "./series";
 export * from "./sync";
+export * from "./week";
