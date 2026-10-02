@@ -10,7 +10,7 @@ import type { EngineConfig } from "./types";
 export const DEFAULT_CONFIG: EngineConfig = {
   appName: "GOTHAM PROTOCOL",
   xpCurve: { base: 80, growth: 1.18 },
-  dayBoundaryHour: 4,
+  dayBoundaryHour: 0,
   nemesis: { xpPerMissedDay: 20 },
   pillars: [
     {
@@ -67,6 +67,20 @@ export const SURFACES = {
   bg: "#050506",
   panel: "#0f0f12",
 } as const;
+
+/**
+ * Where each villain's figure lives for the rogues gallery, keyed by pillar id
+ * (stable even if the villain is renamed in Settings). Drop a transparent PNG
+ * at the path in public/ and it shows up; until then the hall shows an empty
+ * plinth.
+ */
+export const VILLAIN_FIGURES: Record<string, string> = {
+  forge: "villains/bane.png",
+  craft: "villains/penguin.png",
+  archive: "villains/riddler.png",
+  mirror: "villains/two-face.png",
+  discipline: "villains/joker.png",
+};
 
 /**
  * The portrait shown for each rank tier out of the box, before any user has

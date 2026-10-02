@@ -28,9 +28,11 @@ describe("Week boundaries", () => {
     expect(new Date(w.endTs).getDate()).toBe(27);
   });
 
-  it("a 1am Monday log still belongs to Sunday, and so to the earlier week", () => {
-    const w = weekSummary([log("forge", 50, at(2026, 9, 28, 1))], CONFIG, LAST, NOW);
-    expect(w.xp).toBe(50);
+  it("the day ends at midnight: 11:59pm Sunday is the earlier week, 12:01am Monday is the next", () => {
+    const sunday = weekSummary([log("forge", 50, at(2026, 9, 27, 23, 59))], CONFIG, LAST, NOW);
+    const monday = weekSummary([log("forge", 50, at(2026, 9, 28, 0, 1))], CONFIG, LAST, NOW);
+    expect(sunday.xp).toBe(50);
+    expect(monday.xp).toBe(0);
   });
 });
 

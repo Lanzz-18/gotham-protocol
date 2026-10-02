@@ -30,6 +30,16 @@ export function currentRankIndex(overall: number, ranks: readonly RankConfig[]):
   return idx;
 }
 
+/**
+ * How legendary the profile card looks, 0..5. Steps up every two tiers
+ * (Drifter/Initiate 0, Vigilante/Knight Errant 1, ... Overlord/Supreme Leader 4)
+ * and only The Legend reaches 5. Each step keeps everything the last one had.
+ */
+export function legendLevel(tier: number): number {
+  if (tier >= 10) return 5;
+  return Math.max(0, Math.min(4, Math.floor(tier / 2)));
+}
+
 export function currentRank(overall: number, ranks: readonly RankConfig[]): RankConfig {
   return ranks[currentRankIndex(overall, ranks)];
 }

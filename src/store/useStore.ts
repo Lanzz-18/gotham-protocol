@@ -94,7 +94,9 @@ function migrateConfig(c: EngineConfig | undefined): EngineConfig {
   const byId = new Map(DEFAULT_CONFIG.pillars.map((p) => [p.id, p]));
   return {
     ...c,
-    dayBoundaryHour: c.dayBoundaryHour ?? DEFAULT_CONFIG.dayBoundaryHour,
+    // Not editable anywhere in the UI, so a saved value is only ever an old
+    // default (it used to be 4am) — always take the current one.
+    dayBoundaryHour: DEFAULT_CONFIG.dayBoundaryHour,
     nemesis: c.nemesis ?? DEFAULT_CONFIG.nemesis,
     pillars: (c.pillars ?? DEFAULT_CONFIG.pillars).map((p) => ({
       ...p,
