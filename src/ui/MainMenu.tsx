@@ -6,36 +6,26 @@ import { computeStreak } from "../engine/streak";
 import { systemClock } from "../engine/clock";
 import { Icon } from "./Icons";
 import { useMenuSmoke } from "../fx/useMenuSmoke";
+import { useRain } from "../fx/useRain";
 
 interface MainMenuProps {
   onEnter: () => void;
   leaving: boolean;
   motion: boolean;
+  /** The opening splash is still over it: unreachable until it hands over. */
+  blocked?: boolean;
 }
 
 /** Landing screen: the Arkham plate with smoke off the shoulders, one way in. */
-export function MainMenu({ onEnter, leaving, motion }: MainMenuProps) {
+export function MainMenu({ onEnter, leaving, motion, blocked = false }: MainMenuProps) {
   const smokeRef = useMenuSmoke(motion);
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const queued = useRef(0);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const rainRef = useRain(motion, menuRef);
+  const enterRef = useRef<HTMLButtonElement | null>(null);
 
-  /* The plate leans a few pixels toward the cursor. Tiny, but it is what stops
-     the screen reading as a flat photograph — it answers back. */
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!motion || queued.current) return;
-    const { clientX, clientY } = e;
-    queued.current = requestAnimationFrame(() => {
-      queued.current = 0;
-      const stage = stageRef.current;
-      if (!stage) return;
-      const dx = clientX / window.innerWidth - 0.5;
-      const dy = clientY / window.innerHeight - 0.5;
-      stage.style.setProperty("--px", `${(dx * 18).toFixed(1)}px`);
-      stage.style.setProperty("--py", `${(dy * 12).toFixed(1)}px`);
-    });
-  };
+  // autoFocus can't land while the menu is inert, so focus it on the hand-off.
+  useEffect(() => { if (!blocked) enterRef.current?.focus(); }, [blocked]);
 
-  useEffect(() => () => { if (queued.current) cancelAnimationFrame(queued.current); }, []);
   const config = useStore((s) => s.config);
   const pillars = useStore((s) => s.pillars);
   const history = useStore((s) => s.history);
@@ -46,14 +36,14 @@ export function MainMenu({ onEnter, leaving, motion }: MainMenuProps) {
   const streak = computeStreak(history, systemClock, config.dayBoundaryHour, config.restWeeks);
 
   return (
-    <div className={"menu" + (leaving ? " leaving" : "")} onPointerMove={onPointerMove}>
-      <div className="menu-stage" ref={stageRef} aria-hidden="true">
+    <div className={"menu" + (leaving ? " leaving" : "")} inert={blocked} ref={menuRef}>
+      <div className="menu-stage" aria-hidden="true">
         <div className="menu-frame">
           <img className="menu-plate" src="menu-hero.webp" alt="" />
-          <div className="menu-gleam" />
         </div>
         <canvas className="menu-smoke" ref={smokeRef} />
       </div>
+      <canvas className="menu-rain" ref={rainRef} aria-hidden="true" />
       <div className="menu-scrim" aria-hidden="true" />
 
       <div className="menu-inner">
@@ -72,7 +62,7 @@ export function MainMenu({ onEnter, leaving, motion }: MainMenuProps) {
         <div className="menu-bottom">
           {user && <p className="menu-welcome">Welcome, {user.name}</p>}
 
-          <button className="menu-enter" onClick={onEnter} autoFocus>
+          <button className="menu-enter" onClick={onEnter} ref={enterRef}>
             Go to home
           </button>
         </div>

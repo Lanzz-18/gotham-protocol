@@ -48,31 +48,6 @@
   transform:translate(-50%,-50%);
   width:84vw;
   aspect-ratio:1920/1080;
-  /* parallax: --px/--py are set from the pointer in MainMenu */
-  transform:translate(-50%,-50%) translate3d(var(--px,0px), var(--py,0px), 0);
-  transition:transform .55s cubic-bezier(.2,.9,.25,1);
-}
-
-/* He is standing, not posing for a photo — a long, shallow breath. The frame
-   and the smoke share the animation so they never drift apart. */
-@keyframes menu-breathe{
-  0%,100%{transform:scale(1) translateY(0);}
-  50%{transform:scale(1.011) translateY(-0.4%);}
-}
-.menu-frame,
-.menu-smoke{animation:menu-breathe 9.5s ease-in-out infinite;}
-
-/* A soft light crawls over the armour so the highlights shift. */
-.menu-gleam{
-  position:absolute;inset:-12%;
-  pointer-events:none;
-  background:radial-gradient(ellipse 26% 34% at 50% 44%, rgba(255,255,255,0.055), transparent 72%);
-  mix-blend-mode:screen;
-  animation:menu-gleam 17s ease-in-out infinite;
-}
-@keyframes menu-gleam{
-  0%,100%{transform:translate(-9%,3%);opacity:.45;}
-  50%{transform:translate(10%,-4%);opacity:1;}
 }
 /* No border, no glow — the plate has to dissolve into the page on all four
    sides. Feathers are split across the wrapper and the image so each mask is
@@ -103,6 +78,18 @@
   background:
     linear-gradient(180deg, rgba(5,5,6,0.80) 0%, rgba(5,5,6,0.10) 30%, rgba(5,5,6,0.10) 58%, rgba(5,5,6,0.88) 100%);
 }
+
+/* Rain in front of the plate, behind the scrim and the text. */
+.menu-rain{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+/* Lightning: a wash from above, and the armour catches it. */
+.menu-scrim::after{
+  content:"";position:absolute;inset:0;opacity:0;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(237,238,242,0.32), transparent 70%);
+  transition:opacity .3s ease;
+}
+.menu.flash .menu-scrim::after{opacity:1;transition:none;}
+.menu-plate{transition:filter .3s ease;}
+.menu.flash .menu-plate{filter:brightness(1.75) contrast(1.1);transition:none;}
 
 .menu-inner{
   position:relative;height:100%;
@@ -183,6 +170,58 @@
      it use nearly the full width instead. */
   .menu-stage{width:96vw;}
 }
+/* ---------- opening splash ---------- */
+/* Sits over the menu. The canvas paints the darkness itself, so the splash
+   has no background of its own — wherever the swarm erases the dark, the
+   menu underneath shows through. */
+.splash{
+  position:fixed;inset:0;z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;
+}
+.splash.nocanvas{background:var(--bg);}
+.splash-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+
+/* Slow drifting fog, so the title screen breathes instead of sitting dead. */
+.splash-fog{
+  position:absolute;inset:-20%;pointer-events:none;
+  background:
+    radial-gradient(ellipse 40% 30% at 30% 42%, rgba(199,204,214,0.05), transparent 70%),
+    radial-gradient(ellipse 34% 26% at 70% 60%, rgba(199,204,214,0.04), transparent 70%);
+  animation:fog-drift 14s ease-in-out infinite alternate;
+  transition:opacity .4s ease;
+}
+@keyframes fog-drift{
+  from{transform:translate(-4%,1%);}
+  to{transform:translate(4%,-2%);}
+}
+
+.splash-title{
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;gap:26px;
+  transition:opacity .25s ease, transform .25s ease;
+}
+.splash-mark{width:96px;height:52px;color:var(--accent);}
+.splash-mark svg{width:100%;height:auto;display:block;animation:bat-blink 2.6s ease-in-out infinite;}
+.splash-press{
+  font-size:11px;letter-spacing:5px;text-transform:uppercase;color:var(--text);
+  animation:press-blink 2.4s ease-in-out infinite;
+}
+@keyframes press-blink{0%,100%{opacity:.25;}50%{opacity:1;}}
+
+/* The swarm takes over: title and fog step aside, the canvas does the rest. */
+.splash.swarm .splash-fog,
+.splash.swarm .splash-title,
+.splash.out .splash-fog,
+.splash.out .splash-title{opacity:0;}
+.splash.swarm .splash-title{transform:scale(.96);}
+
+.splash.out{opacity:0;transition:opacity .32s ease;pointer-events:none;}
+.splash.fade{opacity:0;transition:opacity .5s ease;pointer-events:none;}
+/* Reduced motion kills every transition globally — but a plain fade is the
+   reduced-motion version of this screen, so it's let through. */
+.reduce-motion .splash.fade{transition:opacity .5s ease !important;}
+
 @media (max-width:400px){
   /* At the 26px clamp floor, 8px letter-spacing pushes "GOTHAM PROTOCOL"
      past a 375px screen and forces an ugly mid-word wrap. Tightening the
