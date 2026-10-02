@@ -17,7 +17,7 @@ const COUNT = 34;
  * initPortraitSmoke(). Re-seeds across particle lifetimes so the effect starts
  * full instead of flashing empty on every rank change.
  */
-export function usePortraitSmoke(enabled: boolean, rankKey: string | number) {
+export function usePortraitSmoke(enabled: boolean, rankKey: string | number, count = COUNT) {
   const ref = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export function usePortraitSmoke(enabled: boolean, rankKey: string | number) {
     };
 
     const parts: Particle[] = [];
-    for (let i = 0; i < COUNT; i++) parts.push(make(true));
+    for (let i = 0; i < count; i++) parts.push(make(true));
 
     const step = () => {
       ctx.clearRect(0, 0, w, h);
@@ -105,7 +105,7 @@ export function usePortraitSmoke(enabled: boolean, rankKey: string | number) {
     return () => {
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [enabled, rankKey]);
+  }, [enabled, rankKey, count]);
 
   return ref;
 }
