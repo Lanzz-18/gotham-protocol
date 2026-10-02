@@ -1,19 +1,23 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useStore } from "../store/useStore";
 import { systemClock } from "../engine/clock";
 import { dayIndexToTs, canRest, currentWeekStart, nextRestWeek, restWeeksUsed, REST_WEEKS_ALLOWED } from "../engine/week";
 import { Modal } from "./Modal";
 
+const LAMP_MS = 2800;
+
 /**
  * "I'm tired Alfred" — the very bottom of the console. Takes the whole
  * current week off: villains hold, the streak is bridged, logging still works.
  */
-export function RestWeek() {
+export function RestWeek({ motion = true }: { motion?: boolean }) {
   const config = useStore((s) => s.config);
   const toggleRestWeek = useStore((s) => s.toggleRestWeek);
   const pushToast = useStore((s) => s.pushToast);
   const [asking, setAsking] = useState(false);
+  const [lamp, setLamp] = useState(false);
 
   const list = config.restWeeks ?? [];
   const week = currentWeekStart(systemClock, config.dayBoundaryHour);
@@ -22,7 +26,13 @@ export function RestWeek() {
 
   const rest = () => {
     setAsking(false);
-    if (toggleRestWeek() === "on") pushToast("Rest week on. The villains hold until Monday.", "ok");
+    if (toggleRestWeek() !== "on") return;
+    pushToast("Rest week on. The villains hold until Monday.", "ok");
+    // Alfred's lamp: the room goes down to one soft light before the console greys out.
+    if (motion) {
+      setLamp(true);
+      window.setTimeout(() => setLamp(false), LAMP_MS);
+    }
   };
 
   const cancel = () => {
@@ -51,6 +61,13 @@ export function RestWeek() {
   return (
     <footer className="alfred">
       {body}
+      {lamp && createPortal(
+        <div className="lamp" aria-hidden="true">
+          <span className="lamp-light" />
+          <span className="lamp-line">Rest well, Master Wayne.</span>
+        </div>,
+        document.body,
+      )}
       {asking && (
         <Modal
           title="Take the week, Master Wayne?"

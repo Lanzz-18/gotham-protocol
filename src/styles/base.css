@@ -80,8 +80,25 @@ body{
 .nav-link:hover{color:#ffffff;text-shadow:0 0 10px rgba(255,255,255,0.45);}
 .nav-link:hover::after{transform:scaleX(1);}
 .nav-link[aria-selected="true"]{color:#ffffff;text-shadow:0 0 10px rgba(255,255,255,0.45);}
-.nav-link[aria-selected="true"]::after{transform:scaleX(1);}
 .nav-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+/* The active tab's mark is the batarang below, not the hover underline. */
+.nav-link[aria-selected="true"]::after,
+.nav-link[aria-selected="true"]:hover::after{transform:scaleX(0);}
+
+/* ---------- batarang tab marker ---------- */
+.nav-links{position:relative;}
+.nav-bat{
+  position:absolute;left:0;bottom:0;width:22px;height:7px;margin-left:-11px;
+  color:#ffffff;pointer-events:none;opacity:0;
+  transform:translateX(var(--x,0px));
+  filter:drop-shadow(0 0 4px rgba(255,255,255,0.75));
+}
+.nav-bat.ready,.nav-bat.fly{opacity:1;}
+.nav-bat.fly{transition:transform .5s cubic-bezier(.3,.85,.3,1);}
+.nav-bat svg{display:block;width:100%;height:100%;}
+/* Two full turns on the way over, flat again on arrival. */
+.nav-bat.fly svg{animation:bat-spin .5s cubic-bezier(.3,.85,.3,1);}
+@keyframes bat-spin{from{transform:rotate(0) scale(1.15);}to{transform:rotate(720deg) scale(1);}}
 
 .nav-menu-btn{
   flex-shrink:0;
@@ -155,6 +172,21 @@ button{font-family:inherit;color:inherit;cursor:pointer;}
 .btn .ic{width:15px;height:15px;flex-shrink:0;}
 .btn:disabled{opacity:.4;cursor:not-allowed;}
 
+/* ---------- rolling numbers ---------- */
+/* Each digit is a 1em window onto a 0–9 strip. The strip's resting transform
+   is the NEW digit, so if animations are switched off it simply shows the
+   right number; the animation only adds the slide from the old one. */
+.roll{display:inline-flex;align-items:flex-start;line-height:1;font-variant-numeric:tabular-nums;}
+.roll-col{display:inline-block;height:1em;line-height:1;overflow:hidden;}
+.roll-strip{
+  display:flex;flex-direction:column;
+  transform:translateY(var(--b));
+  animation:roll-digit .7s cubic-bezier(.2,.9,.25,1) both;
+}
+.roll-strip span{height:1em;line-height:1;text-align:center;}
+.roll-ch{line-height:1;}
+@keyframes roll-digit{from{transform:translateY(var(--a));}to{transform:translateY(var(--b));}}
+
 /* ---------- "I'm tired Alfred" ---------- */
 /* Deliberately quiet: plain text at the very bottom, so it's there when you
    need it and never competes with the pillars for attention. */
@@ -174,7 +206,38 @@ button{font-family:inherit;color:inherit;cursor:pointer;}
 .alfred-copy{margin:0 0 10px;font-size:13px;line-height:1.6;color:var(--muted);}
 .alfred-copy.dim{font-size:12px;color:var(--muted-2);}
 
-.view{animation:fadein .35s ease;}
+/* Alfred's lamp: the room drops to near-black around one soft light, holds,
+   then lifts — and the console underneath has gone grey for the week. */
+.lamp{
+  position:fixed;inset:0;z-index:180;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:22vh;gap:28px;
+  background:rgba(5,5,6,0.9);
+  animation:lamp-room 2.8s ease forwards;
+}
+.lamp-light{
+  width:130px;height:130px;border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,0.75) 0, rgba(237,238,242,0.22) 32%, transparent 70%);
+  box-shadow:0 0 120px 40px rgba(237,238,242,0.08);
+  animation:lamp-glow 2.8s ease-in-out forwards;
+}
+.lamp-line{
+  font-family:var(--font-display);font-size:13px;letter-spacing:5px;text-transform:uppercase;color:var(--muted);
+  animation:lamp-line 2.8s ease forwards;
+}
+@keyframes lamp-room{0%{opacity:0;}18%{opacity:1;}72%{opacity:1;}100%{opacity:0;}}
+@keyframes lamp-glow{0%{opacity:0;transform:scale(.6);}30%{opacity:1;transform:scale(1);}45%{opacity:.85;}55%{opacity:1;}100%{opacity:.9;transform:scale(1.05);}}
+@keyframes lamp-line{0%,25%{opacity:0;transform:translateY(6px);}45%{opacity:1;transform:none;}100%{opacity:1;}}
+
+/* The rest week itself: the console in greyscale until Monday. */
+.hud-body{transition:filter 1.4s ease;}
+.app.resting .hud-body{filter:grayscale(.7) brightness(.92);}
+
+/* Pages slide in from the side you came from (--dir is -1, 0 or 1, set by App). */
+.view{animation:view-in .42s cubic-bezier(.2,.9,.25,1) both;}
+@keyframes view-in{
+  from{opacity:0;transform:translateX(calc(var(--dir, 0) * 22px));}
+  to{opacity:1;transform:none;}
+}
 
 .section-title{font-family:var(--font-display);font-size:16px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin:0 0 12px;display:flex;align-items:center;gap:10px;}
 .section-title::after{content:"";flex:1;height:1px;background:linear-gradient(90deg, var(--edge-strong), transparent);}
@@ -248,7 +311,6 @@ select{cursor:pointer;}
 @keyframes sheen{0%{transform:translateX(-100%);}60%,100%{transform:translateX(220%);}}
 @keyframes barpulse{0%,100%{box-shadow:0 0 12px color-mix(in srgb, var(--barc,var(--accent)) 55%, transparent), inset 0 0 8px rgba(255,255,255,0.2);}50%{box-shadow:0 0 22px color-mix(in srgb, var(--barc,var(--accent)) 85%, transparent), inset 0 0 12px rgba(255,255,255,0.35);}}
 @keyframes surge{0%{filter:brightness(2.4) saturate(1.5);}100%{filter:brightness(1);}}
-@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
 @keyframes toastin{from{opacity:0;transform:translateY(16px) scale(.96);}to{opacity:1;transform:none;}}
 @keyframes ring-pulse{0%,100%{opacity:.82;}50%{opacity:1;}}
 
