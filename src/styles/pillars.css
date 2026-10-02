@@ -52,7 +52,7 @@
   font-family:var(--font-display);font-size:27px;line-height:1;color:var(--text);
   font-variant-numeric:tabular-nums;
 }
-.pc-ring .lv span{font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted-2);}
+.pc-ring .lv > span{font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted-2);}
 
 .pc-title{flex:1;min-width:0;}
 .pc-title .name{
@@ -101,6 +101,8 @@
   transition:background .14s ease, transform .14s ease;
 }
 .log-btn:hover{background:rgba(255,255,255,0.095);transform:translateY(-1px);}
+/* A quick, firm press — the hit that launches the XP. */
+.log-btn:active{transform:scale(.94);transition-duration:.06s;}
 .log-btn:focus-visible{outline:2px solid var(--pc,var(--accent));outline-offset:2px;}
 .log-btn .xp{color:var(--pc,var(--accent));font-size:11.5px;}
 
@@ -110,6 +112,35 @@
   margin-top:16px;font-size:11px;color:var(--muted-2);
 }
 .pc-foot b{color:var(--muted);font-weight:400;}
+
+/* ---------- XP flight ---------- */
+/* The "+50" in flight. Lives on <body>, positioned in viewport pixels. */
+.xp-fly{
+  position:fixed;z-index:300;pointer-events:none;white-space:nowrap;
+  font-family:var(--font-display);font-size:17px;letter-spacing:.5px;
+  color:var(--c, var(--accent));
+  text-shadow:0 0 10px color-mix(in srgb, var(--c, var(--accent)) 70%, transparent);
+  will-change:transform, opacity;
+}
+/* The ring absorbing it: one bright pulse in the pillar's colour. */
+.pc-ring.hit svg{animation:ring-hit .55s ease-out;}
+@keyframes ring-hit{
+  0%{filter:drop-shadow(0 0 0 transparent);}
+  30%{filter:drop-shadow(0 0 9px color-mix(in srgb, var(--pc, var(--accent)) 85%, transparent));}
+  100%{filter:drop-shadow(0 0 0 transparent);}
+}
+/* The spark where the fill comes to rest — waits for the ring to get there. */
+.pc-spark{
+  position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;
+  pointer-events:none;opacity:0;
+  background:radial-gradient(circle, #ffffff 0, var(--pc, var(--accent)) 45%, transparent 70%);
+  animation:pc-spark .5s ease-out .55s forwards;
+}
+@keyframes pc-spark{
+  0%{opacity:0;transform:scale(.4);}
+  35%{opacity:1;transform:scale(1.8);}
+  100%{opacity:0;transform:scale(.6);}
+}
 
 /* ---------- level-up: one soft pulse, no neon ring ---------- */
 @keyframes cardlift{

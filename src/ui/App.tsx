@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useStore } from "../store/useStore";
 import { useDotField } from "../fx/useDotField";
@@ -16,8 +16,14 @@ import { Modal, type ModalAction } from "./Modal";
 import { Toasts } from "./Toasts";
 import { RankUpOverlay } from "./RankUpOverlay";
 import { RestWeek } from "./RestWeek";
+import { RoguesGallery } from "./RoguesGallery";
+import { Splash } from "./Splash";
 import type { LogEntry } from "../engine/types";
+import { currentWeekStart } from "../engine/week";
+import { systemClock } from "../engine/clock";
 import type { PersistedState } from "../store/db";
+
+const VIEW_ORDER: View[] = ["dashboard", "rogues", "history", "stats", "settings"];
 
 type Dialog =
   | { kind: "none" }
@@ -34,6 +40,12 @@ export function App() {
   } = store;
 
   const [view, setView] = useState<View>("dashboard");
+  /** Which way the new page slides in: from the right if its tab is further right. */
+  const [dir, setDir] = useState(0);
+  const go = (v: View) => {
+    setDir(Math.sign(VIEW_ORDER.indexOf(v) - VIEW_ORDER.indexOf(view)));
+    setView(v);
+  };
   const [dialog, setDialog] = useState<Dialog>({ kind: "none" });
   /* menu -> leaving -> console. "leaving" keeps the menu mounted while it
      dissolves, so the console can rise behind it instead of snapping in. */
@@ -44,6 +56,9 @@ export function App() {
   const [returningToMenu, setReturningToMenu] = useState(false);
   const returnTimer = useRef<number | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  // Once per app open. "Main Menu" later only remounts the menu, never this.
+  const [splashOn, setSplashOn] = useState(true);
+  const endSplash = useCallback(() => setSplashOn(false), []);
 
   const importRef = useRef<HTMLInputElement | null>(null);
   const portraitRef = useRef<HTMLInputElement | null>(null);
@@ -174,6 +189,8 @@ export function App() {
   if (!ready) return null;
 
   const rank = rankUpTier !== null ? config.ranks[rankUpTier] : null;
+  // Rest week: the whole console goes grey until Monday.
+  const resting = (config.restWeeks ?? []).includes(currentWeekStart(systemClock, config.dayBoundaryHour));
 
   return (
     <>
@@ -181,34 +198,36 @@ export function App() {
       <div className="vignette" aria-hidden="true" />
 
       {menuPhase !== "closed" && (
-        <MainMenu onEnter={leaveMenu} leaving={menuPhase === "leaving"} motion={motion} />
+        <MainMenu onEnter={leaveMenu} leaving={menuPhase === "leaving"} motion={motion} blocked={splashOn} />
       )}
+      {splashOn && <Splash motion={motion} sound={settings.sound} onDone={endSplash} />}
 
       <div
         className={
           "app"
           + (menuPhase === "leaving" && motion ? " entering" : "")
           + (returningToMenu ? " leaving" : "")
+          + (resting ? " resting" : "")
         }
       >
         <Header
           view={view}
-          onView={setView}
+          onView={go}
           onCustomLog={() => setDialog({ kind: "custom" })}
           onMenu={openMenu}
           onOpenAuth={() => setAuthOpen(true)}
         />
 
         <div className="hud-body">
-          <ProfilePanel onUploadPortrait={askPortrait} motion={motion} />
+          <ProfilePanel onUploadPortrait={askPortrait} motion={motion} live={menuPhase === "closed"} />
 
-          <section>
+          <section style={{ ["--dir" as string]: dir }}>
             {view === "dashboard" && (
               <div className="view" role="tabpanel">
                 <div className="toolbar-row">
                   <h2 className="section-title" style={{ flex: 1 }}>Five Pillars</h2>
                 </div>
-                <PillarGrid />
+                <PillarGrid motion={motion} />
               </div>
             )}
 
@@ -225,8 +244,9 @@ export function App() {
               />
             )}
 
+            {view === "rogues" && <RoguesGallery motion={motion} onLog={() => go("dashboard")} />}
             {view === "stats" && <StatsView />}
-            {view === "dashboard" && <RestWeek />}
+            {view === "dashboard" && <RestWeek motion={motion} />}
 
             {view === "settings" && (
               <SettingsView
@@ -280,7 +300,15 @@ export function App() {
 
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
-      {rank && <RankUpOverlay rank={rank} onDone={clearRankUp} />}
+      {rank && rankUpTier !== null && (
+        <RankUpOverlay
+          rank={rank}
+          from={store.portraits[Math.max(0, rankUpTier - 1)]}
+          to={store.portraits[rankUpTier]}
+          motion={motion}
+          onDone={clearRankUp}
+        />
+      )}
       <Toasts />
 
       <input

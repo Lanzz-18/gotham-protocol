@@ -1,14 +1,40 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useStore } from "../store/useStore";
 import { pillarTotalXP, xpToNext } from "../engine/xp";
 import { computeNemesis, tugOfWar } from "../engine/nemesis";
 import { systemClock } from "../engine/clock";
 import { fmt, relTime } from "../lib/format";
+import { FLY_MS, flyXp } from "../fx/xpFlight";
+import type { PillarId, PillarProgress } from "../engine/types";
 import { Icon } from "./Icons";
+import { Roll } from "./Roll";
 
 const R = 33;
 const CIRC = 2 * Math.PI * R;
+/** The ring starts filling just before the "+XP" finishes arriving. */
+const LAND_MS = FLY_MS - 60;
+
+/**
+ * `value`, but only after it has held still for `ms`. The store updates the
+ * moment you log; the ring waits for the XP to land in it. Rapid taps keep
+ * resetting the wait, so the ring catches up once after the last one.
+ */
+function useLagged<T>(value: T, ms: number): T {
+  const [shown, setShown] = useState(value);
+  useEffect(() => {
+    if (ms === 0) return;
+    const t = window.setTimeout(() => setShown(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return ms === 0 ? value : shown;
+}
+
+/** Where the ring's fill ends, in px inside the 76px ring box. The SVG is turned -90°, so 0 is 12 o'clock. */
+function tipAt(frac: number) {
+  const a = -Math.PI / 2 + Math.min(1, Math.max(0, frac)) * 2 * Math.PI;
+  return { x: 38 + R * Math.cos(a), y: 38 + R * Math.sin(a) };
+}
 
 /** Level sits inside a ring whose fill is progress toward the next level. */
 function LevelRing({ level, frac, accent }: { level: number; frac: number; accent: string }) {
@@ -25,18 +51,20 @@ function LevelRing({ level, frac, accent }: { level: number; frac: number; accen
         />
       </svg>
       <div className="lv">
-        <b>{level}</b>
+        <b><Roll value={level} /></b>
         <span>Level</span>
       </div>
     </div>
   );
 }
 
-export function PillarGrid() {
+export function PillarGrid({ motion }: { motion: boolean }) {
   const config = useStore((s) => s.config);
-  const pillars = useStore((s) => s.pillars);
+  const live = useStore((s) => s.pillars);
   const history = useStore((s) => s.history);
   const addLog = useStore((s) => s.addLog);
+  // Everything ring-related reads the lagged copy, so it moves when the XP lands.
+  const pillars = useLagged(live, motion ? LAND_MS : 0);
 
   // Flash a card once when its level goes up.
   const prevLevels = useRef<Record<string, number>>({});
@@ -81,6 +109,31 @@ export function PillarGrid() {
 
   const nemesis = computeNemesis(history, config, systemClock);
 
+  /** Log it, then send the XP flying into the ring; on landing the ring flashes and a spark pops at the new tip. */
+  const log = (pillar: PillarId, label: string, xp: number, accent: string, btn: HTMLButtonElement) => {
+    addLog(pillar, label, xp);
+    if (!motion) return;
+    const ring = gridRef.current?.querySelector<HTMLElement>(`[data-pillar="${pillar}"] .pc-ring`);
+    if (!ring) return;
+
+    const after: PillarProgress | undefined = useStore.getState().pillars[pillar];
+    const frac = after ? after.xp / xpToNext(after.level, config.xpCurve) : 0;
+
+    flyXp(btn, ring, `+${xp}`, accent, () => {
+      ring.classList.remove("hit");
+      void ring.offsetWidth; // restart the animation on back-to-back hits
+      ring.classList.add("hit");
+
+      const tip = tipAt(frac);
+      const spark = document.createElement("span");
+      spark.className = "pc-spark";
+      spark.style.left = `${tip.x}px`;
+      spark.style.top = `${tip.y}px`;
+      ring.appendChild(spark);
+      window.setTimeout(() => spark.remove(), 1200);
+    });
+  };
+
   return (
     <div className="pillar-grid" ref={gridRef}>
       {config.pillars.map((p) => {
@@ -107,8 +160,8 @@ export function PillarGrid() {
                 <div className="name">{p.name}</div>
                 <div className="theme">{p.theme}</div>
                 <div className="togo">
-                  <b>{fmt(toGo)} XP</b> to level {st.level + 1}
-                  {" · "}{Math.floor(frac * 100)}%
+                  <b><Roll value={toGo} format={fmt} /> XP</b> to level {st.level + 1}
+                  {" · "}<Roll value={Math.floor(frac * 100)} />%
                 </div>
               </div>
               <div className="pc-icon"><Icon name={p.icon} /></div>
@@ -132,7 +185,7 @@ export function PillarGrid() {
 
             <div className="pc-actions">
               {p.actions.map((a, ai) => (
-                <button key={ai} className="log-btn" onClick={() => addLog(p.id, a.label, a.xp)}>
+                <button key={ai} className="log-btn" onClick={(e) => log(p.id, a.label, a.xp, p.accent, e.currentTarget)}>
                   {a.label} <span className="xp">+{a.xp}</span>
                 </button>
               ))}
