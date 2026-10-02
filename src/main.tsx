@@ -7,6 +7,7 @@ import "./styles/profile.css";
 import "./styles/pillars.css";
 import "./styles/history.css";
 import "./styles/stats.css";
+import "./styles/rogues.css";
 import "./styles/settings.css";
 import "./styles/overlays.css";
 import "./styles/menu.css";

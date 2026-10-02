@@ -1,0 +1,346 @@
+/* Rogues gallery: the villains stand on a semicircle around you, the back of
+   the hall at the centre. Every size runs off the stage width (cqw), so the
+   arc keeps its shape at any width instead of the figures overlapping. */
+
+/* ---------- today's status report ---------- */
+.status-card{
+  border-radius:20px;padding:18px 22px 16px;margin-bottom:18px;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0) 45%),
+    var(--panel-solid);
+  box-shadow:0 18px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.status-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:14px;}
+.status-k{font-size:9.5px;letter-spacing:2.4px;text-transform:uppercase;color:var(--muted-2);margin-bottom:4px;}
+.status-date{font-family:var(--font-display);font-size:18px;letter-spacing:1.2px;color:var(--text);line-height:1;}
+.status-threat{text-align:right;}
+.status-v{display:flex;align-items:baseline;gap:8px;justify-content:flex-end;}
+.status-v b{font-family:var(--font-display);font-weight:normal;font-size:30px;line-height:1;color:var(--text);font-variant-numeric:tabular-nums;}
+.status-v > span{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--accent);}
+
+/* One segment per rogue: red while loose, grey once handled. */
+.status-segs{display:flex;gap:5px;margin-bottom:14px;}
+.status-segs i{position:relative;flex:1;height:5px;border-radius:999px;background:var(--accent);opacity:.85;}
+.status-segs i.done{background:rgba(255,255,255,0.12);opacity:1;}
+
+/* Threat slash: a white cut across the segment, a flash, then it goes grey
+   and the villain's name is struck through. --d staggers several at once. */
+.status-segs i.slash{animation:seg-cut .75s ease var(--d,0s) both;}
+@keyframes seg-cut{
+  0%,45%{background:var(--accent);opacity:.85;box-shadow:none;}
+  55%{background:#ffffff;opacity:1;box-shadow:0 0 10px rgba(255,255,255,0.7);}
+  100%{background:rgba(255,255,255,0.12);opacity:1;box-shadow:none;}
+}
+.status-segs i.slash::after{
+  content:"";position:absolute;left:-8%;top:50%;width:116%;height:1.5px;margin-top:-.75px;
+  background:#ffffff;box-shadow:0 0 6px #ffffff;
+  transform:rotate(-4deg) scaleX(0);transform-origin:0 50%;opacity:0;
+  animation:seg-slash .5s cubic-bezier(.2,.9,.25,1) var(--d,0s) forwards;
+}
+@keyframes seg-slash{
+  0%{transform:rotate(-4deg) scaleX(0);opacity:1;}
+  55%{transform:rotate(-4deg) scaleX(1);opacity:1;}
+  100%{transform:rotate(-4deg) scaleX(1);opacity:0;}
+}
+.status-list li.slash .nm{
+  background:linear-gradient(currentColor,currentColor) no-repeat 0 55% / 0 1px;
+  animation:name-strike .4s ease calc(var(--d,0s) + .25s) forwards;
+}
+@keyframes name-strike{to{background-size:100% 1px;}}
+
+.status-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px;}
+.status-list li{display:flex;align-items:baseline;gap:7px;font-size:11.5px;}
+.status-list .nm{color:var(--text);letter-spacing:.5px;}
+.status-list .st{font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent);}
+.status-list li.done .nm{color:var(--muted-2);}
+.status-list li.done .st{color:var(--muted-2);}
+
+.status-line{margin:14px 0 0;font-size:12.5px;color:var(--muted);}
+
+/* Rest week: nothing red, the whole card reads as paused. */
+.status-card.rest .status-v > span,
+.status-card.rest .status-list .st{color:var(--muted-2);}
+.status-card.rest .status-segs i{background:rgba(255,255,255,0.12);}
+
+@media (max-width:480px){
+  .status-card{padding:16px 16px 14px;}
+  .status-v b{font-size:26px;}
+}
+
+.rogues-sub{margin:-4px 0 18px;font-size:12px;color:var(--muted-2);}
+
+.hall-stage{container-type:inline-size;max-width:1080px;margin:0 auto;}
+.hall{
+  position:relative;height:62cqw;
+  border-radius:24px;overflow:hidden;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(255,37,55,0.07), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.035), transparent 70%),
+    var(--panel-solid);
+  box-shadow:0 18px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.hall-floor{
+  position:absolute;left:0;right:0;bottom:0;height:48%;pointer-events:none;
+  background:linear-gradient(to bottom, transparent, rgba(255,255,255,0.025));
+}
+/* Rain sits behind the figures. */
+.hall-rain{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;}
+/* Lightning: the hall goes white for an instant and every villain is lit up. */
+.hall::after{
+  content:"";position:absolute;inset:0;z-index:40;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(237,238,242,0.38), transparent 70%);
+  transition:opacity .28s ease;
+}
+.hall.flash::after{opacity:1;transition:none;}
+.hall.flash .rogue-figure img.on,
+.hall.flash .rogue-ph{filter:brightness(2.4) contrast(1.1);transition:none;}
+/* The line the plinths stand on: top half of an ellipse through every foot. */
+.hall-ring{
+  position:absolute;left:6%;width:88%;pointer-events:none;
+  top:19.8cqw;height:37.2cqw;
+  border:1px solid rgba(255,255,255,0.07);border-radius:50%;
+  clip-path:inset(0 0 50% 0);
+}
+
+.hall-arc{list-style:none;margin:0;padding:0;}
+
+/* --x/--y place the card on the arc, --s shrinks the ones at the back,
+   --p is the villain's power 0..1 and drives every glow below. */
+.rogue{
+  position:absolute;
+  left:calc(var(--x) * 1%);top:calc(var(--y) * 1%);
+  width:13cqw;z-index:var(--z);
+  /* --mx/--my come from the hall (pointer or phone tilt); nearer figures
+     (lower --dep) lean further, which is what makes the arc read as depth.
+     --lift steps a figure forward when it's in the spotlight. */
+  transform:
+    translateX(-50%)
+    translate(calc(var(--mx, 0) * (1.15 - var(--dep, 0)) * 18px), calc(var(--my, 0) * (1.15 - var(--dep, 0)) * 8px))
+    scale(calc(var(--s) * (1 + var(--lift, 0) * 0.08)));
+  transform-origin:50% 0;
+  transition:transform .6s cubic-bezier(.2,.9,.25,1), opacity .4s ease, filter .4s ease;
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+}
+/* The whole figure is the hit target; the button sits over it, invisible. */
+.rogue-hit{
+  position:absolute;inset:-6px;z-index:8;
+  background:none;border:0;padding:0;border-radius:14px;cursor:pointer;
+}
+.rogue-hit:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+.rogue-figure{
+  position:relative;width:100%;aspect-ratio:3/4;
+  display:flex;align-items:flex-end;justify-content:center;
+}
+/* Light from the ceiling. A stronger villain stands in a brighter, redder beam. */
+.rogue-figure::before{
+  content:"";position:absolute;left:-14%;right:-14%;top:-40%;bottom:0;pointer-events:none;
+  background:linear-gradient(to bottom,
+    transparent,
+    rgba(255,255,255,calc(0.015 + var(--p) * 0.03)) 45%,
+    rgba(255,37,55,calc(var(--p) * 0.16)));
+  clip-path:polygon(43% 0, 57% 0, 100% 100%, 0 100%);
+}
+.rogue-figure img{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:contain;object-position:50% 100%;
+  opacity:0;transition:opacity .4s ease, filter .3s ease;
+  filter:drop-shadow(0 0 calc(4px + var(--p) * 18px) rgba(255,37,55,calc(0.12 + var(--p) * 0.5)));
+}
+.rogue-figure img.on{opacity:1;}
+/* Empty plinth until the PNG arrives. */
+.rogue-ph{
+  position:relative;width:60%;height:auto;
+  fill:rgba(255,255,255,0.05);stroke:rgba(255,255,255,0.16);stroke-width:1;stroke-dasharray:3 3;
+}
+.rogue-plinth{
+  width:86%;height:10px;margin-top:-5px;border-radius:50%;
+  background:radial-gradient(ellipse at 50% 50%, rgba(255,37,55,calc(0.08 + var(--p) * 0.45)), transparent 70%);
+}
+
+.rogue-name{
+  margin-top:10px;white-space:nowrap;
+  font-family:var(--font-display);font-size:clamp(10px, 1.25cqw, 14px);letter-spacing:.15em;
+  text-transform:uppercase;color:var(--text);
+}
+.rogue-pillar{
+  margin-top:2px;white-space:nowrap;
+  font-size:clamp(9px, 0.9cqw, 10px);letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);
+}
+.rogue-meter{
+  width:100%;height:5px;margin-top:9px;border-radius:999px;
+  background:rgba(255,255,255,0.07);overflow:hidden;
+}
+.rogue-meter i{
+  display:block;height:100%;border-radius:999px;
+  background:var(--accent);opacity:calc(0.45 + var(--p) * 0.55);
+  transition:width .7s cubic-bezier(.2,.9,.25,1);
+}
+.rogue-meta{display:flex;flex-direction:column;align-items:center;gap:1px;margin-top:6px;}
+.rogue-meta b{
+  font-family:var(--font-display);font-size:16px;line-height:1.1;color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+.rogue-meta > span{font-size:10px;color:var(--muted-2);white-space:nowrap;}
+.rogue.dominant .rogue-meta > span.rogue-days,
+.rogue-meta .rogue-days{color:var(--muted-2);}
+
+/* Dust drifting up through each beam. */
+.rogue-figure::after{
+  content:"";position:absolute;left:-8%;right:-8%;top:-38%;bottom:0;pointer-events:none;
+  background-image:
+    radial-gradient(1.2px 1.2px at 30% 20%, rgba(255,255,255,0.55), transparent 100%),
+    radial-gradient(1px 1px at 62% 35%, rgba(255,255,255,0.45), transparent 100%),
+    radial-gradient(1.4px 1.4px at 48% 58%, rgba(255,255,255,0.5), transparent 100%),
+    radial-gradient(1px 1px at 40% 78%, rgba(255,255,255,0.4), transparent 100%),
+    radial-gradient(1.2px 1.2px at 57% 88%, rgba(255,255,255,0.45), transparent 100%);
+  background-size:100% 50%;
+  clip-path:polygon(43% 0, 57% 0, 100% 100%, 0 100%);
+  opacity:calc(0.3 + var(--p) * 0.45);
+  animation:hall-dust 14s linear infinite;
+}
+@keyframes hall-dust{from{background-position:0 0;}to{background-position:0 -100%;}}
+/* ---------- cell door ---------- */
+/* Bars stay over a villain while it's locked up; the slam is the moment they drop. */
+.rogue-bars{
+  position:absolute;left:10%;right:10%;top:4%;bottom:0;z-index:2;pointer-events:none;
+  display:flex;justify-content:space-between;
+}
+.rogue-bars::before{
+  content:"";position:absolute;left:-6%;right:-6%;top:0;height:4px;border-radius:2px;
+  background:rgba(199,204,214,0.5);
+}
+.rogue-bars i{
+  width:2.5px;height:100%;border-radius:2px;
+  background:linear-gradient(to bottom, rgba(199,204,214,0.6), rgba(199,204,214,0.2));
+  box-shadow:0 0 3px rgba(0,0,0,0.7);
+}
+.rogue-bars.slam{animation:bars-drop .5s cubic-bezier(.6,0,.9,.4) .15s both;}
+@keyframes bars-drop{
+  0%{transform:translateY(-130%);opacity:0;}
+  20%{opacity:1;}
+  78%{transform:translateY(0);}
+  86%{transform:translateY(-5%);}
+  100%{transform:translateY(0);opacity:1;}
+}
+.rogue.slamming .rogue-figure{animation:cell-shake .32s linear .55s;}
+@keyframes cell-shake{
+  0%,100%{transform:none;}
+  20%{transform:translate(-3px,1px);}
+  40%{transform:translate(3px,-1px);}
+  60%{transform:translate(-2px,0);}
+  80%{transform:translate(2px,1px);}
+}
+.rogue-stamp{
+  position:absolute;left:50%;top:44%;z-index:3;pointer-events:none;white-space:nowrap;
+  padding:4px 8px;border:2px solid var(--accent);border-radius:3px;
+  font-family:var(--font-display);font-size:clamp(10px, 1.3cqw, 15px);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--accent);background:rgba(5,5,6,0.55);
+  transform:translate(-50%,-50%) rotate(-10deg);
+  animation:stamp 2s ease .6s both;
+}
+@keyframes stamp{
+  0%{opacity:0;transform:translate(-50%,-50%) rotate(-10deg) scale(2.4);}
+  12%{opacity:1;transform:translate(-50%,-50%) rotate(-10deg) scale(1);}
+  75%{opacity:1;}
+  100%{opacity:0;transform:translate(-50%,-50%) rotate(-10deg) scale(1);}
+}
+
+/* ---------- spotlight focus ---------- */
+.hall.focusing .rogue:not(.on){opacity:.28;filter:grayscale(.7) brightness(.7);}
+.rogue.on{--lift:1;z-index:30;}
+.rogue.on .rogue-figure::before{filter:brightness(1.9);}
+
+.rogue.dormant .rogue-figure,
+.rogue.dormant .rogue-name{opacity:.4;}
+.rogue.dominant .rogue-meta > span{color:var(--accent);}
+.rogue.dominant .rogue-figure img.on{animation:rogue-menace 3.4s ease-in-out infinite;}
+@keyframes rogue-menace{0%,100%{transform:scale(1);}50%{transform:scale(1.025);}}
+
+/* You stand at the centre of the hall, facing them. */
+.hall-center{
+  position:absolute;left:50%;bottom:4%;transform:translateX(-50%);z-index:1;
+  display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;
+}
+.hall-mark{
+  width:46px;height:26px;color:var(--accent);
+  filter:drop-shadow(0 0 12px rgba(255,37,55,0.55));
+}
+.hall-mark svg{width:100%;height:100%;display:block;}
+.hall-k{margin-top:6px;font-size:9.5px;letter-spacing:2.4px;text-transform:uppercase;color:var(--muted-2);}
+.hall-v{font-family:var(--font-display);font-weight:normal;font-size:26px;line-height:1;color:var(--text);}
+.hall-note{font-size:11px;color:var(--muted);}
+.hall-note em{font-style:normal;color:var(--accent);}
+
+/* Too narrow for an arc: the figures would shrink to stamps. Two columns,
+   the threat readout on top, the odd one out centred on the last row. */
+@container (max-width:599px){
+  .hall{height:auto;padding:22px 16px 26px;display:flex;flex-direction:column;}
+  .hall-ring{display:none;}
+  .hall-center{position:static;transform:none;order:-1;margin-bottom:24px;}
+  .hall-arc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:26px 14px;}
+  .rogue{position:relative;left:auto;top:auto;width:auto;transform:none;}
+  .rogue:last-child:nth-child(odd){grid-column:1/-1;justify-self:center;width:50%;}
+  .rogue-figure{width:72%;}
+  .rogue-figure::before{top:-12%;}
+  .rogue-name{font-size:12px;}
+  .rogue-pillar{font-size:9.5px;}
+}
+
+/* ---------- the case file (spotlight focus side panel) ---------- */
+/* Rendered on <body>, so a resting (grey) console can't trap it. */
+.rogue-panel{
+  position:fixed;top:0;right:0;bottom:0;z-index:140;
+  width:min(360px, 100vw);overflow-y:auto;
+  padding:26px 24px 28px;
+  background:var(--panel-solid);
+  border-left:1px solid var(--edge);
+  box-shadow:-30px 0 80px rgba(0,0,0,0.6);
+  animation:panel-in .38s cubic-bezier(.2,.9,.25,1) both;
+}
+@keyframes panel-in{from{transform:translateX(100%);}to{transform:none;}}
+.rp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px;}
+.rp-k{font-size:9.5px;letter-spacing:2.4px;text-transform:uppercase;color:var(--muted-2);margin-bottom:6px;}
+.rp-name{margin:0;font-family:var(--font-display);font-weight:normal;font-size:24px;letter-spacing:2px;text-transform:uppercase;color:var(--text);line-height:1.05;}
+.rp-pillar{margin-top:4px;font-size:10.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted-2);}
+.rp-close{
+  flex-shrink:0;width:32px;height:32px;border-radius:50%;
+  background:rgba(255,255,255,0.05);border:0;color:var(--muted);font-size:20px;line-height:1;
+  transition:color .15s ease, background .15s ease;
+}
+.rp-close:hover{color:var(--text);background:rgba(255,255,255,0.09);}
+.rp-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+.rp-power{display:flex;align-items:baseline;gap:10px;}
+.rp-power b{font-family:var(--font-display);font-weight:normal;font-size:38px;line-height:1;color:var(--text);font-variant-numeric:tabular-nums;}
+.rp-power span{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted);}
+.rogue-panel.dominant .rp-power span,
+.rogue-panel.rising .rp-power span{color:var(--accent);}
+.rp-trend{margin:8px 0 22px;font-size:12px;color:var(--muted);}
+
+/* 14 squares, oldest on the left: red missed, grey-white logged, dashed rest. */
+.rp-days{display:grid;grid-template-columns:repeat(7, minmax(0,1fr));gap:6px 6px;}
+.rp-day{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.rp-day i{width:100%;aspect-ratio:1;border-radius:5px;background:rgba(255,255,255,0.04);}
+.rp-day em{font-style:normal;font-size:9px;color:var(--muted-2);}
+.rp-day.logged i,.rp-legend .logged{background:rgba(237,238,242,0.75);}
+.rp-day.missed i,.rp-legend .missed{background:var(--accent);opacity:.85;}
+.rp-day.rest i,.rp-legend .rest{background:transparent;border:1px dashed var(--edge-strong);}
+.rp-day.today i{background:transparent;border:1px solid var(--edge-strong);}
+.rp-legend{display:flex;gap:14px;margin-top:12px;font-size:10.5px;color:var(--muted-2);}
+.rp-legend span{display:inline-flex;align-items:center;gap:6px;}
+.rp-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;}
+
+.rp-line{margin:22px 0 16px;font-size:12.5px;line-height:1.55;color:var(--text);}
+.rp-log{width:100%;justify-content:center;}
+
+/* Phones: a bottom sheet instead of a side panel. */
+@media (max-width:600px){
+  .rogue-panel{
+    top:auto;left:0;width:auto;max-height:78vh;
+    border-left:0;border-top:1px solid var(--edge);border-radius:20px 20px 0 0;
+    box-shadow:0 -30px 80px rgba(0,0,0,0.6);
+    animation-name:sheet-in;
+  }
+  @keyframes sheet-in{from{transform:translateY(100%);}to{transform:none;}}
+}
