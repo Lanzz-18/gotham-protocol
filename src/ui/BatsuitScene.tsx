@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 
 import { useStore } from "../store/useStore";
 import {
-  MARKERS, OVERVIEW, PILLAR_PARTS, VIEWS, buildBatFigure, pillarFor, type Part, type PillarKey,
+  MARKERS, OVERVIEW, PILLAR_PARTS, VIEWS, buildBatFigure, pillarFor, setGlow, type Part, type PillarKey,
 } from "../fx/batFigure";
+import { loadSuit } from "../fx/loadSuit";
+import type { SuitMesh } from "../fx/suitSdf";
 import { PillarGrid } from "./PillarGrid";
 
 const PART_LABEL: Record<PillarKey, string> = {
@@ -16,8 +18,6 @@ const PART_LABEL: Record<PillarKey, string> = {
   discipline: "Back of the arm",
 };
 const ORDER: PillarKey[] = ["archive", "craft", "mirror", "forge", "discipline"];
-const LIT = new THREE.Color(0x2e070b);
-const UNLIT = new THREE.Color(0x000000);
 /** How far the figure slides left (px) while the stats panel is open on the right. */
 const PANEL_SHIFT = 175;
 
@@ -57,23 +57,18 @@ function Rig({ focus }: { focus: PillarKey | null }) {
   return null;
 }
 
-function Figure({ hover, focus, onHover, onPick }: {
+function Figure({ suit, hover, focus, onHover, onPick }: {
+  suit: SuitMesh;
   hover: PillarKey | null;
   focus: PillarKey | null;
   onHover: (k: PillarKey | null) => void;
   onPick: (k: PillarKey) => void;
 }) {
-  const fig = useMemo(() => buildBatFigure(), []);
+  const fig = useMemo(() => buildBatFigure(suit), [suit]);
 
   // The hovered and focused pillar's body parts glow a deep red.
   useEffect(() => {
-    const lit = new Set<Part>([...(hover ? PILLAR_PARTS[hover] : []), ...(focus ? PILLAR_PARTS[focus] : [])]);
-    fig.traverse((o) => {
-      // Unlit materials (the eyes) have no emissive and keep their own glow.
-      if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshStandardMaterial) {
-        o.material.emissive.copy(lit.has(o.userData.part) ? LIT : UNLIT);
-      }
-    });
+    setGlow(fig, new Set<Part>([...(hover ? PILLAR_PARTS[hover] : []), ...(focus ? PILLAR_PARTS[focus] : [])]));
   }, [fig, hover, focus]);
 
   const at = (e: ThreeEvent<PointerEvent | MouseEvent>) =>
@@ -130,6 +125,8 @@ function Markers({ show, onPick }: { show: boolean; onPick: (k: PillarKey) => vo
  * it while that pillar's card — stats and log buttons — opens on the right.
  */
 export default function BatsuitScene({ motion }: { motion: boolean }) {
+  // Suspends (showing "Suiting up…") until the worker has built the mesh.
+  const suit = use(loadSuit());
   const pillars = useStore((s) => s.config.pillars);
   const [focus, setFocus] = useState<PillarKey | null>(null);
   const [hover, setHover] = useState<PillarKey | null>(null);
@@ -171,7 +168,7 @@ export default function BatsuitScene({ motion }: { motion: boolean }) {
             <meshStandardMaterial color="#0d0d10" roughness={1} metalness={0} />
           </mesh>
 
-          <Figure hover={hover} focus={focus} onHover={setHover} onPick={setFocus} />
+          <Figure suit={suit} hover={hover} focus={focus} onHover={setHover} onPick={setFocus} />
           <Markers show={!focus} onPick={setFocus} />
           <Rig focus={focus} />
         </Canvas>
