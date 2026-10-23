@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { MARKERS, PILLAR_PARTS, VIEWS, pillarFor } from "../../src/fx/batFigure";
+import { MARKERS, VIEWS, pillarFor } from "../../src/fx/batFigure";
 import { DEFAULT_CONFIG } from "../../src/engine/config";
-import { ARMS, GLOW_PARTS, PART_NAMES, meshSuit } from "../../src/fx/suitSdf";
+import { ARMS, PART_NAMES, meshSuit, sdf } from "../../src/fx/suitSdf";
 
 describe("Batsuit body parts → pillars", () => {
   it("front of the head is THE ARCHIVE, back of the head is THE MIRROR", () => {
@@ -24,12 +24,11 @@ describe("Batsuit body parts → pillars", () => {
     expect(pillarFor(undefined, 0)).toBeNull();
   });
 
-  it("every default pillar has a camera view, a marker and parts to light", () => {
+  it("every default pillar has a camera view and a spot on the body for its callout", () => {
     for (const p of DEFAULT_CONFIG.pillars) {
       const k = p.id as keyof typeof VIEWS;
       expect(VIEWS[k], p.id).toBeTruthy();
       expect(MARKERS[k], p.id).toBeTruthy();
-      expect(PILLAR_PARTS[k].length, p.id).toBeGreaterThan(0);
     }
   });
 
@@ -76,17 +75,16 @@ describe("The sculpted Batsuit mesh", () => {
     expect(Math.max(...m.ao)).toBeLessThanOrEqual(1);
   });
 
-  it("lights the head from the jaw up, softly, and never the chest", () => {
-    const n = GLOW_PARTS.length;
-    let crown = Infinity, chest = 0;
-    for (let i = 0; i < count; i++) {
-      const y = m.positions[i * 3 + 1], x = m.positions[i * 3], z = m.positions[i * 3 + 2];
-      const head = m.glow[i * n];
-      if (y > 1.8 && Math.abs(x) < 0.06) crown = Math.min(crown, head);
-      if (y < 1.45 && Math.abs(x) < 0.06 && z > 0) chest = Math.max(chest, head);
+  it("hangs the cape clear of the body, its hem off the ground", () => {
+    const P = m.cape.positions;
+    let closest = Infinity, lowest = Infinity;
+    for (let i = 0; i < P.length; i += 3) {
+      closest = Math.min(closest, sdf(P[i], P[i + 1], P[i + 2]));
+      lowest = Math.min(lowest, P[i + 1]);
     }
-    expect(crown).toBeGreaterThan(0.9);
-    expect(chest).toBeLessThan(0.01);
+    expect(closest).toBeGreaterThan(0.005);
+    expect(lowest).toBeGreaterThan(0.2);
+    expect(m.cape.drape.length).toBe((P.length / 3) * 2); // one (across, down) pair per point, for the motion
   });
 
   it("the arms and head are where the camera views expect them", () => {

@@ -1,13 +1,13 @@
 /**
  * Batman's body as a signed distance field — one function that says how far
  * any point is from the skin — then meshed with surface nets. Masses are
- * blended with smooth-min, so muscles melt into each other the way a sculpt
- * does instead of reading as separate balls and tubes.
+ * blended with smooth-min, so they flow into each other instead of reading as
+ * separate balls and tubes.
  *
- * Proportioned as an athletic 1.88 m man — the torso lofted through real
- * cross-sections, limbs at real lengths — wearing the Arkham suit: cowl,
- * gauntlets, belt, knee pads, shin guards, boots. ~1.9 units tall, feet at
- * y = 0, facing +z, the figure's left at +x.
+ * Shaped after Batman: The Animated Series model sheet — a barrel chest on a
+ * narrow waist, square shoulders, a small head with a block jaw, long lean
+ * legs on pointed feet — in big simple forms that take flat cel shading.
+ * ~1.9 units tall, feet at y = 0, facing +z, the figure's left at +x.
  *
  * No imports, so the same code runs in the mesh worker and on the main thread.
  */
@@ -23,17 +23,10 @@ interface Prim {
   /** Carves into the shape instead of adding to it. */
   sub: boolean;
   box: number[];
-  /**
-   * A dent instead of a shape: how far to press the surface in at this point
-   * (0 outside `box`). Used for the gentle grooves between muscles, where a
-   * carved shape — however softly blended — digs far deeper than intended.
-   */
-  dent?: (x: number, y: number, z: number) => number;
 }
 
 /** Fold one shape into the running distance `d`. */
 function apply(d: number, p: Prim, x: number, y: number, z: number): number {
-  if (p.dent) return d === Infinity ? d : d + p.dent(x, y, z);
   const pd = p.d(x, y, z);
   return p.sub ? smax(d, -pd, p.k) : smin(d, pd, p.k);
 }
@@ -271,14 +264,6 @@ function loft(secs: Section[]) {
   return { prim, at, surface, normal };
 }
 
-/** A frame whose local z points along `zAxis` and whose local y leans toward `up`. */
-function frame(zAxis: Vec3, up: Vec3): Mat3 {
-  const Z = norm(zAxis);
-  const X = norm(cross(up, Z));
-  const Y = cross(Z, X);
-  return [...X, ...Y, ...Z];
-}
-
 /** A flat cut: unit outward normal, and where it sits along it. Inside is n·p ≤ offset. */
 type Plane = [Vec3, number];
 const plane = (n: Vec3, through: Vec3): Plane => {
@@ -311,7 +296,7 @@ function group(prims: Prim[]): Group {
   const box = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
   let pad = 0;
   for (const p of prims) {
-    if (p.sub || p.dent) continue;
+    if (p.sub) continue;
     for (let i = 0; i < 3; i++) {
       box[i] = Math.min(box[i], p.box[i]);
       box[i + 3] = Math.max(box[i + 3], p.box[i + 3]);
@@ -340,26 +325,26 @@ export interface ArmJoints {
 }
 
 function armJoints(side: 1 | -1): ArmJoints {
-  const S: Vec3 = [0.198 * side, 1.49, -0.015];
-  const u1 = norm([Math.sin(0.6) * side, -Math.cos(0.6), -0.03]); // upper arm ~34° out: the reference's A-pose
-  const E = add(S, scale(u1, 0.32));
-  const u2 = norm([Math.sin(0.5) * side, -Math.cos(0.5), 0.15]); // forearm a touch lower and forward
-  const W = add(E, scale(u2, 0.27));
-  const F = add(W, scale(u2, 0.08)); // middle of the hand
-  return { side, S, E, W, F, rE: 0.068, rW: 0.048 };
+  // The arms hang almost straight down, clear of the wide chest, the elbow a
+  // touch out and the forearm angling back in toward the thigh.
+  const S: Vec3 = [0.285 * side, 1.5, -0.012];
+  const E: Vec3 = [0.325 * side, 1.2, -0.03];
+  const W: Vec3 = [0.305 * side, 0.94, 0];
+  const F = add(W, scale(norm(sub(W, E)), 0.06)); // middle of the fist
+  return { side, S, E, W, F, rE: 0.06, rW: 0.045 };
 }
 
 export const ARMS = { L: armJoints(1), R: armJoints(-1) };
 
 /** Where each cowl ear starts and the line it rises along; batFigure finishes the tip. */
 export const EARS = ([1, -1] as const).map((s) => ({
-  base: [0.05 * s, 1.79, -0.016] as Vec3,
+  base: [0.054 * s, 1.835, -0.018] as Vec3,
   /** Where the sculpted part ends and the sharp tip takes over. */
-  mid: [0.057 * s, 1.9, -0.022] as Vec3,
-  tip: [0.063 * s, 1.99, -0.027] as Vec3,
+  mid: [0.058 * s, 1.905, -0.02] as Vec3,
+  tip: [0.063 * s, 1.975, -0.022] as Vec3,
   /** Ear thickness front-to-back, as a fraction of its width. */
   depth: 0.62,
-  midR: 0.0155,
+  midR: 0.0135,
 }));
 
 /** Squash a shape front-to-back around z = `cz` (ears are flatter than they are wide). */
@@ -371,252 +356,110 @@ const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 /** The part of `v` square to `axis`, normalised. */
 const across = (v: Vec3, axis: Vec3) => norm(sub(v, scale(axis, dot(v, axis))));
 
-type Field = (x: number, y: number, z: number) => number;
-
-/** A list of shapes combined the way a group combines them — for measuring a body part while it's built. */
-function unionOf(prims: Prim[]): Field {
-  return (x, y, z) => {
-    let d = Infinity;
-    for (const q of prims) d = apply(d, q, x, y, z);
-    return d;
-  };
-}
-
-/** How far forward (side = 1) or back (side = -1) the skin sits at (x, y). */
-function skinZ(f: Field, x: number, y: number, side: 1 | -1): number {
-  let z = 0.4 * side;
-  for (let i = 0; i < 300; i++) {
-    const d = f(x, y, z);
-    if (d < 1e-5) break;
-    z -= d * side;
-  }
-  return z;
-}
-
-/**
- * A soft valley pressed along a line on the skin: exactly `amp` deep on the
- * line, easing out to nothing `w` either side, with no hard edge anywhere.
- */
-function dentAlong(pts: Vec3[], w: number, amp: number): Prim {
-  const box = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
-  for (const q of pts) {
-    for (let i = 0; i < 3; i++) {
-      box[i] = Math.min(box[i], q[i] - w);
-      box[i + 3] = Math.max(box[i + 3], q[i] + w);
-    }
-  }
-  const segs = pts.slice(1).map((b, i) => {
-    const a = pts[i], ab = sub(b, a);
-    return { a, ab, l2: dot(ab, ab) || 1e-12 };
-  });
-  return {
-    k: 0,
-    sub: false,
-    box,
-    d: () => Infinity,
-    dent(x, y, z) {
-      let best = Infinity;
-      for (const { a, ab, l2 } of segs) {
-        const px = x - a[0], py = y - a[1], pz = z - a[2];
-        const t = Math.min(1, Math.max(0, (px * ab[0] + py * ab[1] + pz * ab[2]) / l2));
-        const qx = px - ab[0] * t, qy = py - ab[1] * t, qz = pz - ab[2] * t;
-        best = Math.min(best, qx * qx + qy * qy + qz * qz);
-      }
-      const s = Math.sqrt(best) / w;
-      return s >= 1 ? 0 : amp * (1 - s * s * (3 - 2 * s));
-    },
-  };
-}
-
-/**
- * The line where one muscle meets the next, drawn on the front (side = 1) or
- * back (side = -1) of the body. Points are (x, y); the line follows the skin.
- */
-function groove(f: Field, pts: Array<[number, number]>, side: 1 | -1, w: number, amp: number): Prim {
-  return dentAlong(pts.map(([x, y]): Vec3 => [x, y, skinZ(f, x, y, side)]), w, amp);
-}
-
-/** Where a ray from `from` along `dir` first meets the skin of `f`. */
-function skinHit(f: Field, from: Vec3, dir: Vec3): Vec3 {
-  const u = norm(dir);
-  let t = 0;
-  for (let i = 0; i < 300; i++) {
-    const p = add(from, scale(u, t));
-    const d = f(p[0], p[1], p[2]);
-    if (d < 1e-5) return p;
-    t += d;
-  }
-  return add(from, scale(u, t));
-}
-
-/** The same on a rounded limb: each point is a spot outside the skin and the direction in toward the bone. */
-function grooveOn(f: Field, pts: Array<[Vec3, Vec3]>, w: number, amp: number): Prim {
-  return dentAlong(pts.map(([from, inward]) => skinHit(f, from, inward)), w, amp);
-}
-
 /* ---------------- the body ----------------
-   Built to a heavily trained 1.88 m man — broad chest and lats over a
-   narrower waist, full shoulders, thick arms and legs — with the Arkham
-   suit's knee pads, shin guards, gauntlets and belt over the top.
-   Landmarks (y): crown 1.87, chin 1.615, collarbone 1.55, shoulder joint
-   1.49, lower pec line 1.352, navel 1.13, belt 1.07, hip joint 0.94,
-   crotch 0.87, knee 0.5, ankle 0.09. */
+   Proportions measured off the animated series model sheet, scaled to a
+   1.87 crown: a small head (chin 1.668), shoulders squared off at 1.6 and
+   reaching 0.37 out, the chest at its widest and deepest at 1.48, a waist
+   barely wider than the belt (1.12–1.22), trunks down to the crotch at 0.97,
+   knee 0.585, ankle 0.1. */
 
-/** The torso, hips to the base of the neck, as real cross-sections. */
+/** The torso, crotch to the base of the neck, as real cross-sections. */
 const TORSO = loft([
-  { y: 0.84, a: 0.055, zf: 0.018, zb: -0.035 }, // rounded off between the legs
-  { y: 0.86, a: 0.1, zf: 0.035, zb: -0.06 },
-  { y: 0.91, a: 0.16, zf: 0.076, zb: -0.112 },
-  { y: 0.965, a: 0.178, zf: 0.092, zb: -0.134 }, // hips, widest at the hip bones
-  { y: 1.025, a: 0.174, zf: 0.101, zb: -0.124 },
-  { y: 1.075, a: 0.166, zf: 0.107, zb: -0.108 }, // belt
-  { y: 1.135, a: 0.157, zf: 0.11, zb: -0.1 }, // waist
-  { y: 1.205, a: 0.165, zf: 0.115, zb: -0.105 },
-  { y: 1.275, a: 0.184, zf: 0.123, zb: -0.115 }, // lower ribs
-  { y: 1.345, a: 0.202, zf: 0.133, zb: -0.124 },
-  { y: 1.415, a: 0.208, zf: 0.139, zb: -0.13 }, // chest
-  { y: 1.475, a: 0.198, zf: 0.131, zb: -0.127 }, // armpits
-  { y: 1.525, a: 0.168, zf: 0.101, zb: -0.11 },
-  { y: 1.56, a: 0.1, zf: 0.068, zb: -0.088 }, // base of the neck
-  { y: 1.585, a: 0.07, zf: 0.052, zb: -0.072 },
+  { y: 0.955, a: 0.05, zf: 0.02, zb: -0.035 }, // rounded off between the legs
+  { y: 0.975, a: 0.115, zf: 0.05, zb: -0.075 },
+  { y: 1.02, a: 0.168, zf: 0.082, zb: -0.105 },
+  { y: 1.08, a: 0.176, zf: 0.092, zb: -0.1 }, // hips, under the belt
+  { y: 1.17, a: 0.172, zf: 0.1, zb: -0.088 }, // belt
+  { y: 1.26, a: 0.182, zf: 0.114, zb: -0.094 }, // waist
+  { y: 1.34, a: 0.21, zf: 0.134, zb: -0.115 },
+  { y: 1.42, a: 0.245, zf: 0.152, zb: -0.138 },
+  { y: 1.48, a: 0.258, zf: 0.16, zb: -0.15 }, // the barrel chest
+  { y: 1.535, a: 0.252, zf: 0.15, zb: -0.155 },
+  { y: 1.575, a: 0.225, zf: 0.118, zb: -0.142 }, // the flat top of the shoulders
+  { y: 1.605, a: 0.145, zf: 0.078, zb: -0.112 },
+  { y: 1.625, a: 0.082, zf: 0.05, zb: -0.075 }, // base of the neck
 ]);
 
 function torso(): Group {
   const T = TORSO;
   const p: Prim[] = [T.prim];
-  const onFront = (x: number, y: number, inset: number): Vec3 =>
-    sub(T.surface(x, y, 1), scale(T.normal(x, y, 1), inset));
   const onBack = (x: number, y: number, inset: number): Vec3 =>
     sub(T.surface(x, y, -1), scale(T.normal(x, y, -1), inset));
 
   for (const s of [1, -1] as const) {
-    // pecs: big plates hung from the collarbone. The top leans back into the
-    // chest and blends away; the lower edge overhangs, drawing the line under it.
-    const pn = norm(add(T.normal(0.092 * s, 1.432, 1), [0, 0.28, 0]));
-    p.push(ellipsoid(sub(T.surface(0.092 * s, 1.432, 1), scale(pn, 0.02)), [0.1, 0.08, 0.044], frame(pn, [-0.22 * s, 1, 0]), 0.02));
-    p.push(roundCone(onFront(0.155 * s, 1.448, 0.014), [0.2 * s, 1.478, 0.04], 0.03, 0.025, 0.03)); // where the pec folds into the shoulder
-    p.push(roundCone([0.042 * s, 1.6, -0.045], [0.192 * s, 1.548, -0.04], 0.058, 0.036, 0.05)); // traps, a slope of muscle from the neck to the shoulder
-    p.push(roundCone(onFront(0.024 * s, 1.548, 0.004), [0.172 * s, 1.56, -0.004], 0.012, 0.016, 0.04)); // collarbone
-
-    // the stomach muscle, one column a side from under the chest to the belt;
-    // the shallow grooves cut below just hint at the pack
-    p.push(ellipsoid(onFront(0.042 * s, 1.222, 0.015), [0.046, 0.135, 0.021], null, 0.04));
-    p.push(ellipsoid([0.142 * s, 1.16, 0.032], [0.034, 0.085, 0.058], rotZ(0.12 * s), 0.035)); // obliques, the flank above the hip
-
-    // back: the lats that make the V, thick shoulder blades with the muscle
-    // that wraps the back of the armpit, the trap's lower run, the columns
-    // either side of the spine
-    p.push(roundCone([0.172 * s, 1.425, -0.06], [0.07 * s, 1.1, -0.088], 0.054, 0.026, 0.06));
-    p.push(ellipsoid(onBack(0.095 * s, 1.43, 0.016), [0.066, 0.082, 0.034], null, 0.045));
-    p.push(ellipsoid([0.158 * s, 1.41, -0.09], [0.036, 0.034, 0.038], rotZ(-0.6 * s), 0.03));
-    p.push(roundCone(onBack(0.07 * s, 1.545, 0.014), onBack(0.014 * s, 1.31, 0.012), 0.03, 0.013, 0.045));
-    p.push(ellipsoid(onBack(0.035 * s, 1.18, 0.012), [0.027, 0.13, 0.022], null, 0.04));
-
-    // glutes, and the side of the hip above them
-    p.push(ellipsoid([0.08 * s, 0.94, -0.076], [0.086, 0.088, 0.045], null, 0.055));
-    p.push(ellipsoid([0.142 * s, 0.995, -0.045], [0.046, 0.06, 0.058], null, 0.035));
+    p.push(roundCone([0.035 * s, 1.645, -0.035], [0.27 * s, 1.575, -0.02], 0.05, 0.034, 0.04)); // traps, running out into the shoulder cap
+    p.push(ellipsoid(onBack(0.11 * s, 1.49, 0.024), [0.075, 0.095, 0.03], null, 0.035)); // shoulder blades, a shallow valley between them
+    p.push(ellipsoid([0.082 * s, 1.03, -0.066], [0.082, 0.075, 0.04], null, 0.045)); // glutes
   }
-  p.push(ellipsoid([0, 1.6, -0.064], [0.075, 0.052, 0.034], null, 0.04)); // the back of the neck, thick with trap
+  p.push(ellipsoid([0, 1.62, -0.07], [0.08, 0.045, 0.035], null, 0.04)); // the back of the neck
+  // chest: one broad, rounded plate across both pecs, its lower edge a soft shelf
+  p.push(ellipsoid(sub(T.surface(0, 1.468, 1), [0, 0, 0.035]), [0.215, 0.085, 0.05], null, 0.05));
 
-  // The separations, cut into the surface the masses above now make. Shallow
-  // and wide: the abs should only just show through the suit.
-  const f = unionOf([...p]);
-  p.push(groove(f, [[0, 1.1], [0, 1.2], [0, 1.3], [0, 1.37]], 1, 0.014, 0.0015)); // down the stomach
-  p.push(groove(f, [[0, 1.1], [0, 1.22], [0, 1.34], [0, 1.53]], -1, 0.016, 0.003)); // the spine
-  for (const s of [1, -1] as const) {
-    // the outer edge of the stomach muscle
-    p.push(groove(f, [[0.088 * s, 1.36], [0.09 * s, 1.27], [0.084 * s, 1.18], [0.072 * s, 1.105]], 1, 0.016, 0.0015));
-    // the three bands across it, making four rows, the top pair tucked under the chest
-    for (const y of [1.312, 1.255, 1.195]) {
-      p.push(groove(f, [[0.004 * s, y], [0.045 * s, y + 0.003], [0.086 * s, y + 0.009]], 1, 0.013, 0.0012));
-    }
-  }
-
-  // belt: wide, with a buckle and pouches round the front and sides
-  const [ba, bzf, bzb] = T.at(1.07);
+  // belt: a tall band with a square buckle; the suit shader draws the pouches on it
+  const [ba, bzf, bzb] = T.at(1.17);
   const bcz = (bzf + bzb) / 2, brx = ba + 0.008, brz = (bzf - bzb) / 2 + 0.008;
-  p.push(band([0, 1.07, bcz], brx, brz, 0.028, 0.007, 0.006));
-  p.push(roundBox([0, 1.07, bcz + brz + 0.004], [0.032, 0.024, 0.01], 0.005, null, 0.003));
-  for (const ang0 of [0.55, 0.95, 1.35, 1.85]) {
-    for (const s of [1, -1] as const) {
-      const ang = ang0 * s;
-      p.push(roundBox([Math.sin(ang) * (brx + 0.006), 1.067, bcz + Math.cos(ang) * (brz + 0.006)], [0.024, 0.03, 0.014], 0.005, rotY(ang), 0.003));
-    }
-  }
+  p.push(band([0, 1.17, bcz], brx, brz, 0.05, 0.008, 0.006));
+  p.push(roundBox([0, 1.17, bcz + brz + 0.004], [0.044, 0.04, 0.01], 0.006, null, 0.003));
   return group(p);
 }
 
 /**
- * The cowl: one helmet over the whole head. Below the eyes it's armour, not
- * flesh — flat planes over the mouth and cheeks, a square jaw narrowing to the
- * chin — so there are no round cheeks to read as puffy.
+ * The cowl over a small round cranium, covering the whole face: below the eyes
+ * a real jaw, not a block. The front narrows from the cheekbones to the mouth,
+ * the jaw turns a clear angle under each ear and runs down to a squared chin
+ * that juts forward, and the cowl's nose stands out with a ridge and a tip.
  */
 function head(): Group {
-  const mask = slab(
+  const jaw = slab(
     [
-      plane([0, 0, 1], [0, 0, 0.088]), // the front, over the mouth
-      plane([0.6, 0, 0.8], [0.03, 0, 0.088]), // cheek planes, angled back from the front
-      plane([-0.6, 0, 0.8], [-0.03, 0, 0.088]),
-      plane([1, 0, 0], [0.062, 0, 0]), // sides of the face
-      plane([-1, 0, 0], [-0.062, 0, 0]),
-      plane([0.823, -0.568, 0], [0.024, 1.618, 0]), // the jawline, narrowing down to the chin
-      plane([-0.823, -0.568, 0], [-0.024, 1.618, 0]),
-      plane([0, -0.885, -0.469], [0, 1.615, 0.075]), // under the jaw, rising back to the neck
-      plane([0, -0.6, 0.8], [0, 1.625, 0.088]), // the chin's lower edge
-      plane([0, 0, -1], [0, 0, -0.03]), // back, inside the head
-      plane([0, 1, 0], [0, 1.738, 0]), // top, under the eyes
+      plane([0, 0.12, 1], [0, 1.71, 0.088]), // the front, over the mouth, leaning so the chin juts
+      plane([0.55, 0, 0.835], [0.042, 0, 0.088]), // cheeks, angled back to the jaw
+      plane([-0.55, 0, 0.835], [-0.042, 0, 0.088]),
+      plane([0.96, 0.28, 0], [0.067, 1.7, 0]), // sides, leaning in to meet the cranium
+      plane([-0.96, 0.28, 0], [-0.067, 1.7, 0]),
+      plane([0.72, -0.694, 0], [0.067, 1.697, 0]), // the jawline, from under the ear down to the chin
+      plane([-0.72, -0.694, 0], [-0.067, 1.697, 0]),
+      plane([0, -1, 0], [0, 1.668, 0]), // flat under the chin
+      plane([0, -0.55, -0.835], [0, 1.668, 0.03]), // under the jaw, rising back to the neck
+      plane([0, 0, -1], [0, 0, -0.02]),
+      plane([0, 1, 0], [0, 1.775, 0]),
     ],
-    [-0.066, 1.598, -0.034, 0.066, 1.742, 0.092],
-    0.006,
-    0.02,
+    [-0.075, 1.66, -0.03, 0.075, 1.78, 0.1],
+    0.005,
+    0.014,
   );
   const p: Prim[] = [
-    roundCone([0, 1.525, -0.02], [0, 1.69, -0.01], 0.072, 0.06, 0), // a thick neck
-    ellipsoid([0, 1.575, -0.02], [0.105, 0.032, 0.088], null, 0.03), // where the cowl meets the suit
-    ellipsoid([0, 1.765, -0.012], [0.083, 0.102, 0.1], null, 0.035), // cranium
-    mask,
-    roundCone([0, 1.764, 0.09], [0, 1.7, 0.094], 0.013, 0.012, 0.03), // nose ridge, running down into the mask
+    roundCone([0, 1.585, -0.022], [0, 1.72, -0.02], 0.07, 0.062, 0), // a thick neck
+    ellipsoid([0, 1.618, -0.022], [0.125, 0.032, 0.105], null, 0.04), // the cowl spreading onto the shoulders
+    ellipsoid([0, 1.785, -0.012], [0.08, 0.092, 0.094], null, 0.035), // cranium
+    jaw,
+    ellipsoid([0, 1.677, 0.086], [0.026, 0.013, 0.01], null, 0.008), // the point of the chin
+    // the nose: a wedge running down from the brow, standing out at the tip
+    ellipsoid([0, 1.784, 0.09], [0.012, 0.032, 0.014], alignY([0, -0.94, 0.33]), 0.014),
   ];
-  for (const s of [1, -1] as const) {
-    p.push(
-      roundCone([0.048 * s, 1.69, -0.032], [0.02 * s, 1.555, 0.05], 0.016, 0.014, 0.02), // neck muscle, ear to breastbone
-      ellipsoid([0.03 * s, 1.763, 0.074], [0.032, 0.011, 0.022], rotZ(0.3 * s), 0.028), // brow, angled down to the nose
-    );
-  }
   for (const e of EARS) {
     // ear: wide at the cowl, tapering up; flatter front-to-back than side-to-side
-    p.push(squashZ(roundCone(e.base, e.mid, 0.032, e.midR, 0.03), e.base[2], e.depth));
+    p.push(squashZ(roundCone(e.base, e.mid, 0.028, e.midR, 0.03), e.base[2], e.depth));
   }
   for (const s of [1, -1] as const) {
-    // shallow eye sockets under the brow, for the slits to sit in
-    p.push({ ...ellipsoid([0.032 * s, 1.745, 0.097], [0.02, 0.01, 0.016], rotZ(0.3 * s), 0.008), sub: true });
+    // shallow eye sockets, for the slits to sit in
+    p.push({ ...ellipsoid([0.032 * s, 1.803, 0.092], [0.02, 0.009, 0.014], rotZ(0.35 * s), 0.006), sub: true });
   }
   return group(p);
 }
 
-/** An open gloved hand, fingers loosely curled toward the palm, palm toward the thigh. */
-function hand(j: ArmJoints): Prim[] {
-  const a = norm(sub(j.W, j.E)); // along the hand
-  const n = across([-j.side, 0, -0.35], a); // out of the palm: in toward the body, a little back
+/** A big gloved fist, knuckles forward, thumb wrapped over the front. */
+function fist(j: ArmJoints): Prim[] {
+  const a = norm(sub(j.W, j.E)); // down the hand
+  const n = across([-j.side, 0, 0], a); // out of the palm, in toward the thigh
   const w = cross(a, n); // across the knuckles
-  const front = w[2] > 0 ? 1 : -1; // which way along w is the front of the hand (the thumb side)
+  const front = w[2] > 0 ? 1 : -1;
   const fr: Mat3 = [...w, ...a, ...n];
   const at = (u: number, v: number, t: number): Vec3 => add(j.W, add(scale(w, u), add(scale(a, v), scale(n, t))));
-
-  const p: Prim[] = [roundBox(at(0, 0.05, 0), [0.045, 0.052, 0.023], 0.017, fr, 0.014)]; // palm
-  const spread = [-0.031, -0.0105, 0.0105, 0.03];
-  const lengths = [0.056, 0.07, 0.074, 0.066];
-  for (let i = 0; i < 4; i++) {
-    const u = spread[i] * front; // little finger at the back, index at the front
-    const base = at(u, 0.097, -0.002);
-    const mid = add(base, add(scale(a, lengths[i] * 0.55), scale(n, 0.012)));
-    const tip = add(mid, add(scale(a, lengths[i] * 0.42), scale(n, 0.024)));
-    p.push(roundCone(base, mid, 0.013, 0.012, 0.004), roundCone(mid, tip, 0.012, 0.0102, 0.004));
-  }
-  const tb = at(0.039 * front, 0.026, 0.013);
-  const tt = add(tb, add(scale(a, 0.045), add(scale(n, 0.024), scale(w, 0.012 * front))));
-  p.push(roundCone(tb, tt, 0.0155, 0.0122, 0.01)); // thumb
-  return p;
+  return [
+    roundBox(at(0, 0.052, 0), [0.05, 0.056, 0.036], 0.026, fr, 0.014), // palm and curled fingers in one block
+    roundCone(at(0.044 * front, 0.028, 0.018), at(0.036 * front, 0.07, 0.03), 0.017, 0.015, 0.008), // thumb
+  ];
 }
 
 function arm(j: ArmJoints): { upper: Group; fore: Group } {
@@ -627,34 +470,38 @@ function arm(j: ArmJoints): { upper: Group; fore: Group } {
   const a2 = norm(u2);
   const up = across([s, 1, 0], a1); // off the top-outside of the upper arm
   const fwd1 = across([0, 0, 1], a1); // the front of the upper arm
-  const top2 = across([s, 0.4, 0], a2); // the top of the forearm, thumb side
-  const outer = across([s, 0, -0.7], a2); // the outer back edge of the forearm, where the fins are
+  const out1 = across([s, 0, 0], a1); // its outside
+  const fwd2 = across([0, 0, 1], a2);
+  const out2 = across([s, 0, 0], a2);
+  /** A point `t` of the way down the bone, `f` forward and `o` outward of it. */
+  const on1 = (t: number, f: number, o: number): Vec3 => add(lerp(S, E, t), add(scale(fwd1, f), scale(out1, o)));
+  const on2 = (t: number, f: number, o: number): Vec3 => add(lerp(E, W, t), add(scale(fwd2, f), scale(out2, o)));
   const upper = group([
-    roundCone(S, E, 0.064, 0.048, 0),
-    // deltoid: a broad cap over the shoulder, its front and rear heads wrapping round
-    ellipsoid(add(add(S, scale(a1, 0.035)), scale(up, 0.02)), [0.074, 0.105, 0.078], alignY(u1), 0.03),
-    ellipsoid(add(add(S, scale(a1, 0.065)), scale(fwd1, 0.042)), [0.04, 0.085, 0.032], alignY(u1), 0.022),
-    ellipsoid(add(add(S, scale(a1, 0.065)), scale(fwd1, -0.046)), [0.046, 0.09, 0.038], alignY(u1), 0.022), // rear delt, fuller from behind
-    ellipsoid(add(lerp(S, E, 0.57), scale(fwd1, 0.026)), [0.05, 0.095, 0.044], alignY(u1), 0.014), // bicep
-    ellipsoid(add(lerp(S, E, 0.42), scale(fwd1, -0.028)), [0.054, 0.115, 0.044], alignY(u1), 0.016), // tricep
+    roundCone(S, E, 0.056, 0.044, 0),
+    // the shoulder cap in three heads, front, side and rear, ending in a V down the outside of the arm
+    ellipsoid(add(on1(0.04, 0, 0.012), scale(up, 0.01)), [0.074, 0.115, 0.076], alignY(u1), 0.03),
+    ellipsoid(on1(0.2, 0.036, 0.004), [0.04, 0.09, 0.036], alignY(u1), 0.02),
+    ellipsoid(on1(0.2, -0.038, 0.004), [0.042, 0.09, 0.036], alignY(u1), 0.02),
+    ellipsoid(on1(0.58, 0.03, 0), [0.046, 0.088, 0.044], alignY(u1), 0.012), // bicep, peaked
+    ellipsoid(on1(0.42, -0.03, 0.006), [0.05, 0.11, 0.044], alignY(u1), 0.014), // tricep
+    ellipsoid(on1(0.7, 0.004, 0.03), [0.03, 0.065, 0.028], alignY(u1), 0.014), // between the two, outside, above the elbow
   ]);
   const fore = group([
-    roundCone(E, W, 0.052, 0.037, 0),
-    // forearm muscle, thick below the elbow and tapering to the wrist
-    ellipsoid(add(lerp(E, W, 0.27), scale(top2, 0.02)), [0.056, 0.11, 0.05], alignY(u2), 0.024), // along the top
-    ellipsoid(add(lerp(E, W, 0.3), scale(top2, -0.018)), [0.05, 0.11, 0.046], alignY(u2), 0.024), // underneath
-    roundCone(lerp(E, W, 0.08), lerp(E, W, 0.135), 0.072, 0.07, 0.006), // gauntlet lip at the elbow
-    roundCone(lerp(E, W, 0.87), lerp(E, W, 0.96), 0.05, 0.048, 0.006), // wrist cuff
-    ellipsoid(add(lerp(E, W, 0.47), scale(outer, 0.05)), [0.032, 0.12, 0.02], alignY(u2), 0.02), // armour ridge where the fins sit
-    ...hand(j),
+    roundCone(E, W, 0.046, 0.036, 0),
+    ellipsoid(on2(0.04, -0.03, 0), [0.03, 0.03, 0.028], null, 0.014), // the point of the elbow
+    ellipsoid(on2(0.26, 0.016, 0.02), [0.05, 0.12, 0.044], alignY(u2), 0.018), // the big muscle along the top, thick below the elbow
+    ellipsoid(on2(0.3, -0.008, -0.022), [0.046, 0.12, 0.044], alignY(u2), 0.018), // underneath
+    roundCone(lerp(E, W, 0.1), lerp(E, W, 0.16), 0.064, 0.062, 0.008), // the glove's cuff
+    ...fist(j),
   ]);
   return { upper, fore };
 }
 
 function leg(s: 1 | -1): Group {
-  const H: Vec3 = [0.104 * s, 0.94, 0.004];
-  const K: Vec3 = [0.114 * s, 0.5, 0.012];
-  const A: Vec3 = [0.124 * s, 0.088, -0.012];
+  // feet planted apart, the legs running a little outward from the hip
+  const H: Vec3 = [0.095 * s, 0.99, 0];
+  const K: Vec3 = [0.115 * s, 0.585, -0.004];
+  const A: Vec3 = [0.135 * s, 0.1, -0.025];
   const up = alignY(sub(K, H));
   const low = alignY(sub(A, K));
   const axis = norm(sub(K, H));
@@ -663,36 +510,21 @@ function leg(s: 1 | -1): Group {
   /** A point `t` of the way down the thigh, `f` forward and `o` outward of the bone. */
   const at = (t: number, f: number, o: number): Vec3 => add(lerp(H, K, t), add(scale(fr, f), scale(ou, o)));
 
-  const p: Prim[] = [
-    roundCone(H, K, 0.084, 0.05, 0), // thigh
-    ellipsoid(at(0.4, 0.008, 0.058), [0.062, 0.21, 0.064], up, 0.03), // the outer sweep of the quad
-    ellipsoid(at(0.38, 0.056, 0.006), [0.052, 0.22, 0.046], up, 0.028), // down the front
-    ellipsoid(at(0.78, 0.032, -0.038), [0.046, 0.1, 0.044], up, 0.034), // the teardrop above the knee
-    ellipsoid(at(0.42, -0.05, 0), [0.066, 0.21, 0.06], up, 0.03), // hamstrings
-    ellipsoid(at(0.26, 0, -0.036), [0.05, 0.14, 0.058], up, 0.032), // inner thigh, clear of the other leg
-    roundBox(add(K, [0, 0.014, 0.06]), [0.05, 0.06, 0.026], 0.024, low, 0.014), // knee pad
-    roundCone(K, A, 0.06, 0.045, 0.02), // shin
-    ellipsoid(add(lerp(K, A, 0.26), [0.02 * s, 0, -0.042]), [0.046, 0.125, 0.056], low, 0.03), // calf, outer head
-    ellipsoid(add(lerp(K, A, 0.24), [-0.018 * s, 0, -0.044]), [0.05, 0.13, 0.058], low, 0.03), // calf, inner head
-    roundBox(add(lerp(K, A, 0.42), [0, 0, 0.048]), [0.048, 0.18, 0.023], 0.02, low, 0.014), // shin guard
-    roundCone(lerp(K, A, 0.32), add(A, [0, -0.02, 0]), 0.068, 0.058, 0.012), // boot shaft
-    roundBox([0.124 * s, 0.05, 0.056], [0.053, 0.048, 0.132], 0.032, rotY(-0.08 * s), 0.016), // boot
-    roundBox([0.124 * s, 0.015, 0.053], [0.057, 0.015, 0.14], 0.009, rotY(-0.08 * s), 0.005), // sole
-    ellipsoid([0.124 * s, 0.066, -0.033], [0.047, 0.055, 0.049], null, 0.016), // heel
-  ];
-
-  // Soft separations between the quad's heads, traced onto the thigh. Each
-  // point is how far down the thigh, and the angle round from the front
-  // toward the outside.
-  const f = unionOf([...p]);
-  const line = (pts: Array<[number, number]>) =>
-    pts.map(([t, ang]): [Vec3, Vec3] => {
-      const dir = add(scale(fr, Math.cos(ang)), scale(ou, Math.sin(ang)));
-      return [add(lerp(H, K, t), scale(dir, 0.2)), scale(dir, -1)];
-    });
-  p.push(grooveOn(f, line([[0.18, 0.62], [0.45, 0.7], [0.72, 0.62]]), 0.024, 0.0016)); // outer sweep | front
-  p.push(grooveOn(f, line([[0.12, -0.15], [0.45, -0.45], [0.78, -0.85]]), 0.024, 0.0016)); // front | inner, spiralling to the knee
-  return group(p);
+  return group([
+    // the thigh as one round, full mass, swelling below the hip and tapering into
+    // the knee; the muscles on it are broad and soft so it shades as one form
+    roundCone(H, lerp(H, K, 0.35), 0.086, 0.092, 0),
+    roundCone(lerp(H, K, 0.35), K, 0.092, 0.048, 0.04),
+    ellipsoid(at(0.42, 0.024, 0.014), [0.075, 0.22, 0.07], up, 0.05), // quads, rounding out the front and outside
+    ellipsoid(at(0.4, -0.03, 0), [0.07, 0.2, 0.06], up, 0.05), // hamstrings
+    ellipsoid(at(0.78, 0.022, -0.026), [0.042, 0.09, 0.04], up, 0.04), // the teardrop above the knee
+    roundCone(K, A, 0.05, 0.036, 0.02), // shin
+    ellipsoid(add(lerp(K, A, 0.26), [0.016 * s, 0, -0.038]), [0.048, 0.12, 0.05], low, 0.045), // calf, outer head
+    ellipsoid(add(lerp(K, A, 0.24), [-0.016 * s, 0, -0.04]), [0.052, 0.125, 0.054], low, 0.045), // calf, inner head
+    // the boot's foot, flat on the ground: round at the heel, a rounded toe, a flat sole
+    roundCone([A[0], 0.05, -0.055], [A[0] + 0.014 * s, 0.032, 0.14], 0.05, 0.032, 0.02),
+    roundBox([A[0] + 0.007 * s, 0.012, 0.042], [0.05, 0.012, 0.118], 0.008, rotY(-0.06 * s), 0.024),
+  ]);
 }
 
 const T = torso();
@@ -725,30 +557,33 @@ function evalGroup(g: Group, x: number, y: number, z: number): number {
     if (d !== Infinity) {
       // A shape can only change the result if it reaches within its blend
       // radius of the surface so far; its box distance is a lower bound.
-      // A dent does nothing outside its box at all.
       const pb = p.box;
       const ex = Math.max(pb[0] - x, 0, x - pb[3]);
       const ey = Math.max(pb[1] - y, 0, y - pb[4]);
       const ez = Math.max(pb[2] - z, 0, z - pb[5]);
       const bd = Math.sqrt(ex * ex + ey * ey + ez * ez);
-      if (p.dent ? bd > 0 : p.sub ? bd >= p.k - d : bd >= d + p.k) continue;
+      if (p.sub ? bd >= p.k - d : bd >= d + p.k) continue;
     }
     d = apply(d, p, x, y, z);
   }
   return d;
 }
 
-/** How the groups join: torso, head, legs L/R, left arm upper/fore, right arm upper/fore. */
-function combine(t: number, h: number, ll: number, lr: number, alu: number, alf: number, aru: number, arf: number) {
+/** How the groups join, at height y: torso, head, legs L/R, left arm upper/fore, right arm upper/fore. */
+function combine(y: number, t: number, h: number, ll: number, lr: number, alu: number, alf: number, aru: number, arf: number) {
   let d = smin(t, h, 0.04);
-  d = smin(d, smin(alu, alf, 0.012), 0.022);
-  d = smin(d, smin(aru, arf, 0.012), 0.022);
+  // Over the top of the shoulder the arm melts into the torso in one line;
+  // from the armpit down it stays clear of the chest instead of webbing to it.
+  const sh = Math.min(1, Math.max(0, (y - 1.46) / 0.08));
+  const ka = 0.022 + 0.026 * sh * sh * (3 - 2 * sh);
+  d = smin(d, smin(alu, alf, 0.012), ka);
+  d = smin(d, smin(aru, arf, 0.012), ka);
   // The legs meet each other with a hard crease, never a web — a soft blend
   // there melted the thighs into one lump. They join the hips more firmly too.
   return smin(d, Math.min(ll, lr), 0.022);
 }
 /** The widest blend between groups — anything further than this can't touch the join. */
-const JOIN_K = 0.045;
+const JOIN_K = 0.048;
 
 /** Distance to the whole figure. Fills `gd` with each group's own distance when given. */
 export function sdf(x: number, y: number, z: number, gd?: Float64Array): number {
@@ -763,7 +598,7 @@ export function sdf(x: number, y: number, z: number, gd?: Float64Array): number 
   if (gd) {
     gd[0] = t; gd[1] = h; gd[2] = ll; gd[3] = lr; gd[4] = alu; gd[5] = alf; gd[6] = aru; gd[7] = arf;
   }
-  return combine(t, h, ll, lr, alu, alf, aru, arf);
+  return combine(y, t, h, ll, lr, alu, alf, aru, arf);
 }
 
 const boxGap = (a: number[], b: number[]) =>
@@ -791,6 +626,7 @@ function localField(cell: number[]) {
   };
   return (x: number, y: number, z: number) =>
     combine(
+      y,
       run(lists[0], x, y, z), run(lists[1], x, y, z), run(lists[2], x, y, z), run(lists[3], x, y, z),
       run(lists[4], x, y, z), run(lists[5], x, y, z), run(lists[6], x, y, z), run(lists[7], x, y, z),
     );
@@ -818,6 +654,131 @@ export function traceSurface(o: Vec3, dir: Vec3, maxT = 1.5): Vec3 | null {
   return null;
 }
 
+/* ---------------- the cape ---------------- */
+
+export interface CapeMesh {
+  positions: Float32Array;
+  indices: Uint32Array;
+  /**
+   * Where each point sits on the cloth, two per point: across it (0 at one
+   * edge, 1 at the other) and down it (0 where it's pinned at the top, 1 at the
+   * hem). The cape's motion grows with the second.
+   */
+  drape: Float32Array;
+}
+
+/** Columns across the cape (six scallops of eight) and rows down it. */
+const CAPE_U = 48;
+const CAPE_V = 64;
+/** How far the cloth keeps off the body. */
+const CAPE_CLEAR = 0.012;
+/**
+ * How the rows bunch toward the top: dense where the cloth wraps the
+ * shoulders, so it can't dip into them between rows, sparse down the hang.
+ */
+const CAPE_BUNCH = 2;
+
+/** A smooth curve through (y, value) keys, y ascending — the same cubic the torso loft uses. */
+function keyed(ys: number[], vs: number[]) {
+  const n = ys.length;
+  const tg = vs.map((_, i) => {
+    const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1);
+    return (vs[i1] - vs[i0]) / (ys[i1] - ys[i0]);
+  });
+  return (y: number) => {
+    const yc = Math.min(ys[n - 1], Math.max(ys[0], y));
+    let i = 0;
+    while (i < n - 2 && yc > ys[i + 1]) i++;
+    const h = ys[i + 1] - ys[i];
+    const t = (yc - ys[i]) / h, t2 = t * t, t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * vs[i] + (t3 - 2 * t2 + t) * h * tg[i] + (-2 * t3 + 3 * t2) * vs[i + 1] + (t3 - t2) * h * tg[i + 1];
+  };
+}
+
+// The cape's cross-section at each height, seen from above: an arc round him
+// from one front edge, behind him, to the other. At angle φ along it (0 behind
+// him, ±φm at the front edges) a point sits at x = SX·sin φ, z = ZC − RZ·cos φ.
+// From the top: a collar round the base of the neck, then a mantle over both
+// shoulder caps opening at the front, then round the outside of the arms to
+// hang behind them — wide enough to frame them from the front, far enough back
+// to clear the forearm fins — flaring out toward the hem.
+const CAPE_Y = [0.27, 0.6, 0.9, 1.2, 1.38, 1.5, 1.6, 1.635];
+const CAPE_SX = keyed(CAPE_Y, [0.488, 0.457, 0.437, 0.426, 0.426, 0.4, 0.27, 0.1]);
+const CAPE_ZC = keyed(CAPE_Y, [-0.07, -0.144, -0.182, -0.184, -0.132, -0.02, -0.02, -0.02]);
+const CAPE_RZ = keyed(CAPE_Y, [0.17, 0.091, 0.048, 0.036, 0.068, 0.15, 0.13, 0.1]);
+const CAPE_PHI = keyed(CAPE_Y, [80, 80, 80, 80, 100, 125, 135, 140].map((d) => (d * Math.PI) / 180));
+/** Where the cape is fastened round the neck, under the cowl's collar. */
+const CAPE_TOP = 1.635;
+
+/** Nudge a point out of the body until it's `CAPE_CLEAR` off the skin. */
+function clearOfBody(p: Vec3): Vec3 {
+  for (let i = 0; i < 4; i++) {
+    const d = sdf(p[0], p[1], p[2]);
+    if (d >= CAPE_CLEAR) break;
+    p = add(p, scale(normalAt(p[0], p[1], p[2]), CAPE_CLEAR - d));
+  }
+  return p;
+}
+
+/**
+ * The cape as a sheet of cloth, fastened round the neck under the cowl: a
+ * mantle over both shoulders that opens at the front, wrapping round the
+ * outside of the arms and hanging behind them to a hem cut into six points.
+ * Wherever that shape would pass through the body the cloth is pushed back
+ * out, then smoothed, so it drapes over the shoulders instead of cutting in.
+ */
+export function drapeCape(): CapeMesh {
+  const cols = CAPE_U + 1;
+  const pts: Vec3[] = [];
+  for (let j = 0; j <= CAPE_V; j++) {
+    const v = j / CAPE_V;
+    for (let i = 0; i <= CAPE_U; i++) {
+      const u = (i / CAPE_U) * 2 - 1;
+      // hem: six points, each scallop rising to a notch between them
+      const s = (3 * (u + 1)) % 1;
+      const yh = 0.27 + 0.07 * (1 - Math.abs(2 * s - 1));
+      const y = CAPE_TOP + (yh - CAPE_TOP) * Math.pow(v, CAPE_BUNCH);
+      // this column's place on the cross-section at this height; wherever that
+      // lands inside him (over the shoulders, round the arms) it's pushed out
+      const ph = u * CAPE_PHI(y);
+      pts.push(clearOfBody([CAPE_SX(y) * Math.sin(ph), y, CAPE_ZC(y) - CAPE_RZ(y) * Math.cos(ph)]));
+    }
+  }
+
+  // smooth the cloth, keeping the hem's points, then push it clear of the body again
+  for (let pass = 0; pass < 3; pass++) {
+    const prev = pts.map((p): Vec3 => [p[0], p[1], p[2]]);
+    for (let j = 1; j < CAPE_V; j++) {
+      for (let i = 0; i <= CAPE_U; i++) {
+        const k = j * cols + i;
+        const nb = [prev[k - cols], prev[k + cols]];
+        if (i > 0) nb.push(prev[k - 1]);
+        if (i < CAPE_U) nb.push(prev[k + 1]);
+        const avg = scale(nb.reduce((a, q) => add(a, q), [0, 0, 0] as Vec3), 1 / nb.length);
+        pts[k] = clearOfBody(lerp(prev[k], avg, 0.5));
+      }
+    }
+  }
+
+  const positions = new Float32Array(pts.length * 3);
+  pts.forEach((p, k) => positions.set(p, k * 3));
+  const drape = new Float32Array(pts.length * 2);
+  for (let j = 0; j <= CAPE_V; j++) {
+    for (let i = 0; i <= CAPE_U; i++) drape.set([i / CAPE_U, Math.pow(j / CAPE_V, CAPE_BUNCH)], (j * cols + i) * 2);
+  }
+  // winding gives each face a normal pointing away from the body
+  const indices = new Uint32Array(CAPE_U * CAPE_V * 6);
+  let n = 0;
+  for (let j = 0; j < CAPE_V; j++) {
+    for (let i = 0; i < CAPE_U; i++) {
+      const a = j * cols + i, b = a + 1, c = a + cols, d = c + 1;
+      indices.set([a, b, c, b, d, c], n);
+      n += 6;
+    }
+  }
+  return { positions, indices, drape };
+}
+
 /* ---------------- meshing ---------------- */
 
 export interface SuitMesh {
@@ -828,23 +789,12 @@ export interface SuitMesh {
   parts: Uint8Array;
   /** Ambient occlusion per vertex, 0 (fully shut in) to 1 (open). */
   ao: Float32Array;
-  /**
-   * How much each vertex belongs to each part that can light up, five per
-   * vertex in GLOW_PARTS order. Soft across the joints, so a lit part fades out
-   * instead of ending on a jagged line of triangles.
-   */
-  glow: Float32Array;
+  cape: CapeMesh;
   /** How long meshing took, in ms. */
   ms: number;
 }
 
 const BOUNDS = { x0: -0.74, x1: 0.74, y0: -0.035, y1: 1.94, z0: -0.21, z1: 0.23 };
-
-/** The parts that light up when picked, by group index (head, left arm upper/fore, right arm upper/fore). */
-export const GLOW_PARTS = ["head", "armL-upper", "armL-fore", "armR-upper", "armR-fore"] as const;
-const GLOW_GROUPS = [1, 4, 5, 6, 7];
-/** How quickly membership falls away from a part's own surface, in metres. */
-const GLOW_TAU = 0.004;
 
 /** Occlusion probe: steps out along the normal, and how hard a shortfall darkens. */
 const AO_STEP = 0.007;
@@ -1010,28 +960,15 @@ export function meshSuit(h = 0.0065): SuitMesh {
   const normals = Float32Array.from(nrm);
   const parts = new Uint8Array(count);
   const ao = new Float32Array(count);
-  const glow = new Float32Array(count * GLOW_PARTS.length);
   const gd = new Float64Array(8);
-  const wt = new Float64Array(8);
   for (let vi = 0; vi < count; vi++) {
     const x = pos[vi * 3], y = pos[vi * 3 + 1], z = pos[vi * 3 + 2];
     sdf(x, y, z, gd);
     let best = 0;
     for (let g = 1; g < 8; g++) if (gd[g] < gd[best]) best = g;
     // the head ends at the jawline; the neck and cowl skirt below it read as body
-    if (best === 1 && y < 1.585) best = 0;
+    if (best === 1 && y < 1.615) best = 0;
     parts[vi] = GROUP_PART[best];
-
-    // soft membership: each group weighs less the further its own surface is
-    // from here than the nearest group's
-    let near = gd[0], sum = 0;
-    for (let g = 1; g < 8; g++) near = Math.min(near, gd[g]);
-    for (let g = 0; g < 8; g++) sum += wt[g] = Math.exp(-(gd[g] - near) / GLOW_TAU);
-    const neck = Math.min(1, Math.max(0, (y - 1.572) / 0.026)); // the head glows from the jaw up
-    for (let gi = 0; gi < GLOW_GROUPS.length; gi++) {
-      const w = wt[GLOW_GROUPS[gi]] / sum;
-      glow[vi * GLOW_PARTS.length + gi] = gi === 0 ? w * neck * neck * (3 - 2 * neck) : w;
-    }
 
     // Step out along the normal: on open ground the skin is exactly that far
     // away, in a crease it's nearer. The shortfall darkens the vertex, which is
@@ -1047,6 +984,7 @@ export function meshSuit(h = 0.0065): SuitMesh {
     ao[vi] = Math.max(AO_FLOOR, 1 - AO_GAIN * occ);
   }
 
+  const cape = drapeCape();
   const end = typeof performance !== "undefined" ? performance.now() : Date.now();
-  return { positions, normals, indices: Uint32Array.from(idx), parts, ao, glow, ms: end - start };
+  return { positions, normals, indices: Uint32Array.from(idx), parts, ao, cape, ms: end - start };
 }

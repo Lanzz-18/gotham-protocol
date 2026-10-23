@@ -8,5 +8,8 @@ const ctx = self as unknown as {
 
 ctx.onmessage = () => {
   const m = meshSuit();
-  ctx.postMessage(m, [m.positions.buffer, m.normals.buffer, m.indices.buffer, m.parts.buffer, m.ao.buffer, m.glow.buffer]);
+  ctx.postMessage(m, [
+    m.positions.buffer, m.normals.buffer, m.indices.buffer, m.parts.buffer, m.ao.buffer,
+    m.cape.positions.buffer, m.cape.indices.buffer, m.cape.drape.buffer,
+  ]);
 };
